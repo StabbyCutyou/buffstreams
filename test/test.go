@@ -3,14 +3,13 @@ package main
 import (
 	"github.com/Sirupsen/logrus"
 	"github.com/StabbyCutyou/buffstreams"
-	"log"
 	"time"
 )
 
 func TestCallback(bts []byte) error {
-	log.Print("BYTES")
-	log.Print(bts)
-	log.Print(string(bts))
+	logrus.Print("BYTES")
+	logrus.Print(bts)
+	logrus.Print(string(bts))
 	return nil
 }
 

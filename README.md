@@ -25,3 +25,9 @@ Why did you write this?
 I'm working on a few projects in Golang that all had this need - open some tcp connections or listen for some, and push bytes of protobuff messages around.
 
 So, I took the code I copied and pasted a few times and tried to make it a real thing.
+
+Logging
+=======================
+Logrus is in there right now (because it's great) to help me with testing.
+
+It wont necessarily be a real dependency of the library, I want to offer the ability to sub in your logger of choice along with a proper way to configure the BuffManager class itself.
