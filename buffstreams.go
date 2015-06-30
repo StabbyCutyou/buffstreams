@@ -144,7 +144,8 @@ func readFromConnection(reader net.Conn, buffer []byte) (int, error) {
 	return bytesLen, nil
 }
 
-func (bm *BuffManager) dialOut(ip string, port string) error {
+// If you want to dial out but not immediately write, use this method
+func (bm *BuffManager) DialOut(ip string, port string) error {
 	address := formatAddress(ip, port)
 	if _, ok := bm.dialedConnections[address]; ok == true {
 		// Need to clean it out on any error...
@@ -166,12 +167,12 @@ func (bm *BuffManager) dialOut(ip string, port string) error {
 	return nil
 }
 
-// Write a version of this that allows for automatic DialOuts, as well as one-shot connections that clean up afterward
+// Write data and dial out if the conn isn't open
 func (bm *BuffManager) WriteTo(ip string, port string, data []byte, closeConnection bool) (int, error) {
 	address := formatAddress(ip, port)
 	// Get the connection if it's cached, or open a new one
 	if _, ok := bm.dialedConnections[address]; ok != true {
-		err := bm.dialOut(ip, port)
+		err := bm.DialOut(ip, port)
 		if err != nil {
 			// Error dialing out, cannot write
 			// bail
