@@ -30,9 +30,9 @@ func formatAddress(address string, port string) string {
 	return address + ":" + port
 }
 
-func (bm *BuffManager) StartListening(protocol string, port string, cb ListenCallback) error {
+func (bm *BuffManager) StartListening(port string, cb ListenCallback) error {
 	address := formatAddress("", port)
-	receiveSocket, err := net.Listen(protocol, address)
+	receiveSocket, err := net.Listen("tcp", address)
 	if err != nil {
 		return err
 	}
@@ -144,7 +144,7 @@ func readFromConnection(reader net.Conn, buffer []byte) (int, error) {
 	return bytesLen, nil
 }
 
-func (bm *BuffManager) DialOut(protocol string, ip string, port string) error {
+func (bm *BuffManager) DialOut(ip string, port string) error {
 	address := formatAddress(ip, port)
 	if _, ok := bm.dialedConnections[address]; ok == true {
 		// Need to clean it out on any error...
@@ -166,6 +166,7 @@ func (bm *BuffManager) DialOut(protocol string, ip string, port string) error {
 	return nil
 }
 
+// Write a version of this that allows for automatic DialOuts, as well as one-shot connections that clean up afterward
 func (bm *BuffManager) WriteTo(ip string, port string, data []byte) (int, error) {
 	address := formatAddress(ip, port)
 	// Calculate how big the message is, using a consistent header size. MAKE THIS CONFIGURABLE in some sane way
