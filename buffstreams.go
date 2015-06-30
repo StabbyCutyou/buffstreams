@@ -71,7 +71,7 @@ func handleListenedConn(address string, conn net.Conn, cb ListenCallback) {
 		_, err := readFromConnection(conn, headerBuffer)
 		if err != nil && err.Error() == "EOF" {
 			// Log the error we got from the call to read
-			logrus.Error("First")
+			logrus.Error("Error reading from the connection. Likely it closed on the clients end")
 			logrus.Error(err)
 			conn.Close()
 			return
@@ -82,12 +82,12 @@ func handleListenedConn(address string, conn net.Conn, cb ListenCallback) {
 		// Not sure what the correct way to handle these errors are. For now, bomb out
 		if bytesParsed == 0 {
 			// "Buffer too small"
-			logrus.Error("Second")
+			logrus.Error("0 Bytes parsed from header")
 			logrus.Error(err)
 			return
 		} else if bytesParsed < 0 {
 			// "Buffer overflow"
-			logrus.Error("Third")
+			logrus.Error("Less than zero bytes parsed from header?")
 			logrus.Error(err)
 			return
 		}
@@ -95,7 +95,7 @@ func handleListenedConn(address string, conn net.Conn, cb ListenCallback) {
 		bytesLen, err := readFromConnection(conn, dataBuffer)
 		if err != nil && err.Error() == "EOF" {
 			// log the error from the call to read
-			logrus.Error("Fourth")
+			logrus.Error("Failure to read from connection")
 			logrus.Error(err)
 			conn.Close()
 			return
@@ -144,7 +144,7 @@ func readFromConnection(reader net.Conn, buffer []byte) (int, error) {
 	return bytesLen, nil
 }
 
-func (bm *BuffManager) DialOut(ip string, port string) error {
+func (bm *BuffManager) dialOut(ip string, port string) error {
 	address := formatAddress(ip, port)
 	if _, ok := bm.dialedConnections[address]; ok == true {
 		// Need to clean it out on any error...
@@ -167,13 +167,25 @@ func (bm *BuffManager) DialOut(ip string, port string) error {
 }
 
 // Write a version of this that allows for automatic DialOuts, as well as one-shot connections that clean up afterward
-func (bm *BuffManager) WriteTo(ip string, port string, data []byte) (int, error) {
+func (bm *BuffManager) WriteTo(ip string, port string, data []byte, closeConnection bool) (int, error) {
 	address := formatAddress(ip, port)
+	// Get the connection if it's cached, or open a new one
+	if _, ok := bm.dialedConnections[address]; ok != true {
+		err := bm.dialOut(ip, port)
+		if err != nil {
+			// Error dialing out, cannot write
+			// bail
+			return 0, err
+		}
+	}
 	// Calculate how big the message is, using a consistent header size. MAKE THIS CONFIGURABLE in some sane way
 	toWriteLen := UInt16ToByteArray(uint16(len(data)), MessageSizeToBitLength(4096))
 	// Append the size to the message, so now it has a header
 	toWrite := append(toWriteLen, data...)
 	bm.Lock()
 	defer bm.Unlock()
-	return bm.dialedConnections[address].Write(toWrite)
+	written, err := bm.dialedConnections[address].Write(toWrite)
+	bm.dialedConnections[address].Close()
+	delete(bm.dialedConnections, address)
+	return written, err
 }
