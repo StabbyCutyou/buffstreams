@@ -78,7 +78,7 @@ On the next write attempt, it will be opened anew
 Additionally, BuffManager can listen on local ports for incoming requests. 
 
 ```go
-buffM.StartListening("5031", TestCallback)
+buffM.StartListening("5031", ListenCallbackExample)
 ```
 
 Again, BuffManager will keep hold of this socket, and all incoming connections internally to itself. It is nonblocking, so your program or library must continue to run while BuffStreams is listening and handling connections. It is not a daemon.
