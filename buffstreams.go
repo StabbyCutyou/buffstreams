@@ -187,7 +187,7 @@ func (bm *BuffManager) CloseDialer(ip string, port string) error {
 }
 
 // Write data and dial out if the conn isn't open
-func (bm *BuffManager) WriteTo(ip string, port string, data []byte, closeConnection bool) (int, error) {
+func (bm *BuffManager) WriteTo(ip string, port string, data []byte, persist bool) (int, error) {
 	address := formatAddress(ip, port)
 	// Get the connection if it's cached, or open a new one
 	bm.RLock()
@@ -207,7 +207,7 @@ func (bm *BuffManager) WriteTo(ip string, port string, data []byte, closeConnect
 	// Append the size to the message, so now it has a header
 	toWrite := append(toWriteLen, data...)
 	written, err := bm.dialedConnections[address].Write(toWrite)
-	if err != nil || closeConnection == true {
+	if err != nil || persist == true {
 		err := bm.CloseDialer(ip, port)
 		if err != nil {
 			// TODO ponder the following:
