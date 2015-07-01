@@ -96,9 +96,11 @@ BuffManager only gets you there, you have to do the work.
 A sample callback might start like so:
 
 ```go
-  msg := &message.ImportantProtoBuffStreamingMessage{}
-  err := proto.Unmarshal(data, msg)
-  // Now you do some stuff with msg
+  func ListenCallbackExample ([]byte data) error {
+    msg := &message.ImportantProtoBuffStreamingMessage{}
+    err := proto.Unmarshal(data, msg)
+    // Now you do some stuff with msg
+  }
 ```
 
 The callback is currently run in it's own goroutine, which also handles reading from the connection until the reader disconnects, or there is an error. Any errors reading from a connection incoming will be up to the client to handle.
