@@ -48,6 +48,7 @@ func (bm *BuffManager) startListening(address string, socket net.Listener, cb Li
 
 	go func(address string, listener net.Listener) {
 		for {
+			// Wait for someone to connect
 			conn, err := listener.Accept()
 			if err != nil {
 				// alert error
@@ -67,7 +68,6 @@ func handleListenedConn(address string, conn net.Conn, cb ListenCallback) {
 		logrus.Info("Reading")
 		headerByteSize := MessageSizeToBitLength(4098) // MAKE THIS CONFIGURABLE once you have any idea how you're going to do that
 		headerBuffer := make([]byte, headerByteSize)
-
 		// First, read the number of bytes required to determine the message length
 		_, err := readFromConnection(conn, headerBuffer)
 		if err != nil && err.Error() == "EOF" {
@@ -206,7 +206,9 @@ func (bm *BuffManager) WriteTo(ip string, port string, data []byte, persist bool
 	toWriteLen := UInt16ToByteArray(uint16(len(data)), MessageSizeToBitLength(4096))
 	// Append the size to the message, so now it has a header
 	toWrite := append(toWriteLen, data...)
+	bm.Lock()
 	written, err := bm.dialedConnections[address].Write(toWrite)
+	bm.Unlock()
 	if err != nil || persist == true {
 		err := bm.CloseDialer(ip, port)
 		if err != nil {
