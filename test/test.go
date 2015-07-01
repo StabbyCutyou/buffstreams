@@ -16,11 +16,12 @@ func TestCallback(bts []byte) error {
 func main() {
 	logrus.SetLevel(logrus.DebugLevel)
 	bm := buffstreams.New()
-	bm.StartListening("tcp", "5031", TestCallback)
-	bm.DialOut("tcp", "127.0.0.1", "5031")
+	bm.StartListening("5031", TestCallback)
+	bm.DialOut("127.0.0.1", "5031")
 	msg := []byte("Hello!")
 	for i := 0; i < 500; i++ {
-		bm.WriteTo("127.0.0.1", "5031", msg)
+		_, err := bm.WriteTo("127.0.0.1", "5031", msg, false)
+		logrus.Info(err)
 		time.Sleep(time.Millisecond * 10)
 	}
 	time.Sleep(time.Second * 10)

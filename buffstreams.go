@@ -13,6 +13,7 @@ import (
 type BuffManager struct {
 	dialedConnections map[string]net.Conn
 	listeningSockets  map[string]net.Listener
+	//TODO I could control access to the maps better if I centralized how they got accessed - less locking code littered around
 	sync.RWMutex
 }
 
@@ -84,11 +85,13 @@ func handleListenedConn(address string, conn net.Conn, cb ListenCallback) {
 			// "Buffer too small"
 			logrus.Error("0 Bytes parsed from header")
 			logrus.Error(err)
+			conn.Close()
 			return
 		} else if bytesParsed < 0 {
 			// "Buffer overflow"
 			logrus.Error("Less than zero bytes parsed from header?")
 			logrus.Error(err)
+			conn.Close()
 			return
 		}
 		dataBuffer := make([]byte, msgLength)
@@ -108,17 +111,17 @@ func handleListenedConn(address string, conn net.Conn, cb ListenCallback) {
 			// I ultimately have some design choices here
 			// Currently, I am invoking a delegate thats been passed down the stack
 			// I could...
-			// Keep it as is
-			// Tie the protobuffs library deeper into it, and take a reference to
-			// the type that the message we're serializing is, and do that work too
-			// But you'd still need a callback, unless...
-			// I just push it onto a queue (not a slow ass channel, but a queue)
+			// Just push it onto a queue (not a slow ass channel, but a queue)
 			// which has a reference passed down to it, and the main process
 			// spawns a goroutine to reap off the queue and handle those in parallel
 
 			// Callback, atm
 			logrus.Info("Callback")
-			cb(dataBuffer)
+			err = cb(dataBuffer)
+			if err != nil {
+				logrus.Error("Error in Callback")
+				logrus.Error(err)
+			}
 		}
 	}
 }
@@ -147,10 +150,13 @@ func readFromConnection(reader net.Conn, buffer []byte) (int, error) {
 // If you want to dial out but not immediately write, use this method
 func (bm *BuffManager) DialOut(ip string, port string) error {
 	address := formatAddress(ip, port)
+	bm.RLock()
 	if _, ok := bm.dialedConnections[address]; ok == true {
+		bm.RUnlock()
 		// Need to clean it out on any error...
 		return errors.New("You have a connection to this ip and port open already")
 	}
+	bm.RUnlock()
 	tcpAddr, err := net.ResolveTCPAddr("tcp", address)
 	if err != nil {
 		return err
@@ -167,26 +173,51 @@ func (bm *BuffManager) DialOut(ip string, port string) error {
 	return nil
 }
 
+func (bm *BuffManager) CloseDialer(ip string, port string) error {
+	address := formatAddress(ip, port)
+	bm.Lock()
+	if _, ok := bm.dialedConnections[address]; ok != true {
+		err := bm.dialedConnections[address].Close()
+		delete(bm.dialedConnections, address)
+		bm.Unlock()
+		return err
+	}
+	bm.Unlock()
+	return nil
+}
+
 // Write data and dial out if the conn isn't open
 func (bm *BuffManager) WriteTo(ip string, port string, data []byte, closeConnection bool) (int, error) {
 	address := formatAddress(ip, port)
 	// Get the connection if it's cached, or open a new one
+	bm.RLock()
 	if _, ok := bm.dialedConnections[address]; ok != true {
 		err := bm.DialOut(ip, port)
 		if err != nil {
 			// Error dialing out, cannot write
 			// bail
+			bm.RUnlock()
 			return 0, err
 		}
+	} else {
+		bm.RUnlock()
 	}
 	// Calculate how big the message is, using a consistent header size. MAKE THIS CONFIGURABLE in some sane way
 	toWriteLen := UInt16ToByteArray(uint16(len(data)), MessageSizeToBitLength(4096))
 	// Append the size to the message, so now it has a header
 	toWrite := append(toWriteLen, data...)
-	bm.Lock()
-	defer bm.Unlock()
 	written, err := bm.dialedConnections[address].Write(toWrite)
-	bm.dialedConnections[address].Close()
-	delete(bm.dialedConnections, address)
+	if err != nil || closeConnection == true {
+		err := bm.CloseDialer(ip, port)
+		if err != nil {
+			// TODO ponder the following:
+			// Error closing the dialer, should we still return 0 written?
+			// What if some bytes written, then failure, then also the close throws an error
+			// []error is a better return type, but not sure if thats a thing you're supposed to do...
+			// Possibilities for error not as complicated as i'm thinking?
+			return 0, err
+		}
+	}
+	// Return the bytes written, any error
 	return written, err
 }
