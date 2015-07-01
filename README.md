@@ -55,20 +55,20 @@ The BuffManager has one primary function managing two kinds of TCP connections (
 The BuffManager can dial out to remote TCP endpoints
 
 ```go
-bm.DialOut("127.0.0.1", "5031")
+buffM.DialOut("127.0.0.1", "5031")
 ```
 It will store a reference to the connection internally, and synchronize access to it. In this way, a single BuffManager should be considered thread safe question marks???
 
 And either write in a single-message fashion (which closed the connection)
 
 ```go
-  bytesWritten, err := bm.WriteTo("127.0.0.1", "5031", msg, false)
+  bytesWritten, err := buffM.WriteTo("127.0.0.1", "5031", msg, false)
 ```
 
 Or with a persistent connection in a streaming fashion
 
 ```go
-  bytesWritten, err := bm.WriteTo("127.0.0.1", "5031", msg, true)
+  bytesWritten, err := buffM.WriteTo("127.0.0.1", "5031", msg, true)
 ```
 
 If there is an error in writing, that connection will be closed and removed from the collection.
@@ -78,7 +78,7 @@ On the next write attempt, it will be opened anew
 Additionally, BuffManager can listen on local ports for incoming requests. 
 
 ```go
-bm.StartListening("5031", TestCallback)
+buffM.StartListening("5031", TestCallback)
 ```
 
 Again, BuffManager will keep hold of this socket, and all incoming connections internally to itself. It is nonblocking, so your program or library must continue to run while BuffStreams is listening and handling connections. It is not a daemon.
