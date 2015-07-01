@@ -192,11 +192,11 @@ func (bm *BuffManager) WriteTo(ip string, port string, data []byte, persist bool
 	// Get the connection if it's cached, or open a new one
 	bm.RLock()
 	if _, ok := bm.dialedConnections[address]; ok != true {
+		bm.RUnlock()
 		err := bm.DialOut(ip, port)
 		if err != nil {
 			// Error dialing out, cannot write
 			// bail
-			bm.RUnlock()
 			return 0, err
 		}
 	} else {
