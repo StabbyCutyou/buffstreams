@@ -77,7 +77,6 @@ func (bm *BuffManager) startListening(address string, socket net.Listener, cb Li
 func handleListenedConn(address string, conn net.Conn, maxMessageSize int, cb ListenCallback) {
 	for {
 		// Handle getting the data header
-		logrus.Info("Reading")
 		headerByteSize := maxMessageSize
 		headerBuffer := make([]byte, headerByteSize)
 		// First, read the number of bytes required to determine the message length
@@ -128,7 +127,6 @@ func handleListenedConn(address string, conn net.Conn, maxMessageSize int, cb Li
 			// spawns a goroutine to reap off the queue and handle those in parallel
 
 			// Callback, atm
-			logrus.Info("Callback")
 			err = cb(dataBuffer)
 			if err != nil {
 				logrus.Error("Error in Callback")
