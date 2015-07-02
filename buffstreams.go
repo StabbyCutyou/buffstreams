@@ -5,7 +5,7 @@ import ()
 import (
 	"encoding/binary"
 	"errors"
-	"github.com/Sirupsen/logrus"
+	"log"
 	"net"
 	"sync"
 )
@@ -15,12 +15,14 @@ type BuffManager struct {
 	listeningSockets  map[string]net.Listener
 	// TODO find a way to sanely provide this to a Dialer or a Receiver on a per-connection basis
 	MaxMessageSizeBitLength int
+	EnableLogging           bool
 	// TODO I could control access to the maps better if I centralized how they got accessed - less locking code littered around
 	sync.RWMutex
 }
 
 type BuffManagerConfig struct {
 	MaxMessageSize int
+	EnableLogging  bool
 }
 
 func New(cfg BuffManagerConfig) *BuffManager {
@@ -58,23 +60,24 @@ func (bm *BuffManager) startListening(address string, socket net.Listener, cb Li
 	bm.listeningSockets[address] = socket
 	bm.Unlock()
 
-	go func(address string, listener net.Listener) {
+	go func(address string, maxMessageSizeBitLength int, enableLogging bool, listener net.Listener) {
 		for {
 			// Wait for someone to connect
 			conn, err := listener.Accept()
 			if err != nil {
-				// alert error
-				// Hmmm but how - I'm in goroutine land. Need a class level logger? Don't want to
-				// tie people to the bleh default logger, also personally would prefer logrus for levels
+				if enableLogging == true {
+					log.Print("Error attempting to accept connection")
+					log.Print(err)
+				}
 			} else {
 				// Hand this off and immediately listen for more
-				go handleListenedConn(address, conn, bm.MaxMessageSizeBitLength, cb)
+				go handleListenedConn(address, conn, bm.MaxMessageSizeBitLength, enableLogging, cb)
 			}
 		}
-	}(address, socket)
+	}(address, bm.MaxMessageSizeBitLength, bm.EnableLogging, socket)
 }
 
-func handleListenedConn(address string, conn net.Conn, maxMessageSize int, cb ListenCallback) {
+func handleListenedConn(address string, conn net.Conn, maxMessageSize int, enableLogging bool, cb ListenCallback) {
 	for {
 		// Handle getting the data header
 		headerByteSize := maxMessageSize
@@ -83,8 +86,10 @@ func handleListenedConn(address string, conn net.Conn, maxMessageSize int, cb Li
 		_, err := readFromConnection(conn, headerBuffer)
 		if err != nil && err.Error() == "EOF" {
 			// Log the error we got from the call to read
-			logrus.Error("Error reading from the connection. Likely it closed on the clients end")
-			logrus.Error(err)
+			if enableLogging == true {
+				log.Printf("Address %s: Client closed connection", address)
+				log.Print(err)
+			}
 			conn.Close()
 			return
 		}
@@ -94,14 +99,18 @@ func handleListenedConn(address string, conn net.Conn, maxMessageSize int, cb Li
 		// Not sure what the correct way to handle these errors are. For now, bomb out
 		if bytesParsed == 0 {
 			// "Buffer too small"
-			logrus.Error("0 Bytes parsed from header")
-			logrus.Error(err)
+			if enableLogging == true {
+				log.Printf("Address %s: 0 Bytes parsed from header", address)
+				log.Print(err)
+			}
 			conn.Close()
 			return
 		} else if bytesParsed < 0 {
 			// "Buffer overflow"
-			logrus.Error("Less than zero bytes parsed from header?")
-			logrus.Error(err)
+			if enableLogging == true {
+				log.Printf("Address %s: Buffer Less than zero bytes parsed from header", address)
+				log.Print(err)
+			}
 			conn.Close()
 			return
 		}
@@ -109,8 +118,10 @@ func handleListenedConn(address string, conn net.Conn, maxMessageSize int, cb Li
 		bytesLen, err := readFromConnection(conn, dataBuffer)
 		if err != nil && err.Error() == "EOF" {
 			// log the error from the call to read
-			logrus.Error("Failure to read from connection")
-			logrus.Error(err)
+			if enableLogging == true {
+				log.Printf("Address %s: Failure to read from connection", address)
+				log.Print(err)
+			}
 			conn.Close()
 			return
 		}
@@ -128,9 +139,9 @@ func handleListenedConn(address string, conn net.Conn, maxMessageSize int, cb Li
 
 			// Callback, atm
 			err = cb(dataBuffer)
-			if err != nil {
-				logrus.Error("Error in Callback")
-				logrus.Error(err)
+			if err != nil && enableLogging == true {
+				log.Printf("Error in Callback")
+				log.Print(err)
 			}
 		}
 	}
@@ -227,6 +238,10 @@ func (bm *BuffManager) WriteTo(ip string, port string, data []byte, persist bool
 			// What if some bytes written, then failure, then also the close throws an error
 			// []error is a better return type, but not sure if thats a thing you're supposed to do...
 			// Possibilities for error not as complicated as i'm thinking?
+			if bm.EnableLogging == true {
+				// The error will get returned up the stack, no need to log it here?
+				log.Print("There was an error writing the message, and a subsequent error cleaning up the connection")
+			}
 			return 0, err
 		}
 	}
