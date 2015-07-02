@@ -13,15 +13,27 @@ import (
 type BuffManager struct {
 	dialedConnections map[string]net.Conn
 	listeningSockets  map[string]net.Listener
-	//TODO I could control access to the maps better if I centralized how they got accessed - less locking code littered around
+	// TODO find a way to sanely provide this to a Dialer or a Receiver on a per-connection basis
+	MaxMessageSizeBitLength int
+	// TODO I could control access to the maps better if I centralized how they got accessed - less locking code littered around
 	sync.RWMutex
 }
 
-func New() *BuffManager {
+type BuffManagerConfig struct {
+	MaxMessageSize int
+}
+
+func New(cfg BuffManagerConfig) *BuffManager {
 	bm := &BuffManager{
 		dialedConnections: make(map[string]net.Conn),
 		listeningSockets:  make(map[string]net.Listener),
 	}
+	maxMessageSize := 4096
+	// 0 is the default, and the message must be atleast 1 byte large
+	if cfg.MaxMessageSize != 0 {
+		maxMessageSize = cfg.MaxMessageSize
+	}
+	bm.MaxMessageSizeBitLength = MessageSizeToBitLength(maxMessageSize)
 	return bm
 }
 
@@ -56,17 +68,17 @@ func (bm *BuffManager) startListening(address string, socket net.Listener, cb Li
 				// tie people to the bleh default logger, also personally would prefer logrus for levels
 			} else {
 				// Hand this off and immediately listen for more
-				go handleListenedConn(address, conn, cb)
+				go handleListenedConn(address, conn, bm.MaxMessageSizeBitLength, cb)
 			}
 		}
 	}(address, socket)
 }
 
-func handleListenedConn(address string, conn net.Conn, cb ListenCallback) {
+func handleListenedConn(address string, conn net.Conn, maxMessageSize int, cb ListenCallback) {
 	for {
 		// Handle getting the data header
 		logrus.Info("Reading")
-		headerByteSize := MessageSizeToBitLength(4098) // MAKE THIS CONFIGURABLE once you have any idea how you're going to do that
+		headerByteSize := maxMessageSize
 		headerBuffer := make([]byte, headerByteSize)
 		// First, read the number of bytes required to determine the message length
 		_, err := readFromConnection(conn, headerBuffer)
@@ -202,8 +214,8 @@ func (bm *BuffManager) WriteTo(ip string, port string, data []byte, persist bool
 	} else {
 		bm.RUnlock()
 	}
-	// Calculate how big the message is, using a consistent header size. MAKE THIS CONFIGURABLE in some sane way
-	toWriteLen := UInt16ToByteArray(uint16(len(data)), MessageSizeToBitLength(4096))
+	// Calculate how big the message is, using a consistent header size.
+	toWriteLen := UInt16ToByteArray(uint16(len(data)), bm.MaxMessageSizeBitLength)
 	// Append the size to the message, so now it has a header
 	toWrite := append(toWriteLen, data...)
 	bm.Lock()
