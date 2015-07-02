@@ -20,17 +20,16 @@ func main() {
 	cfg := buffstreams.BuffManagerConfig{
 		MaxMessageSize: 256,
 	}
-	bm := buffstreams.New(cfg)
-	bm.StartListening("5031", TestCallback)
-	bm.DialOut("127.0.0.1", "5031")
 	// 100 byte message
 	msg := []byte("HeyheyheyHeyheyheyHeyheyheyHeyheyheyHeyheyheyHeyheyheyHeyheyheyHeyheyheyHeyheyheyHeyheyheyHeyheyheyH!")
 	startingPort := 5031
 	for i := 0; i < 10; i++ {
 		go func(n int, port string) {
+			bm := buffstreams.New(cfg)
+			bm.StartListening(strconv.Itoa(startingPort), TestCallback)
 			count := 0
 			for {
-				_, err := bm.WriteTo("127.0.0.1", "5031", msg, true)
+				_, err := bm.WriteTo("127.0.0.1", strconv.Itoa(startingPort), msg, true)
 				if err != nil {
 					log.Print("EEEEEERRRRROOOOOOOORRRRRRRRRRR")
 					log.Print(err)
