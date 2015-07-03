@@ -29,6 +29,7 @@ func New(cfg BuffManagerConfig) *BuffManager {
 	bm := &BuffManager{
 		dialedConnections: make(map[string]net.Conn),
 		listeningSockets:  make(map[string]net.Listener),
+		EnableLogging:     cfg.EnableLogging,
 	}
 	maxMessageSize := 4096
 	// 0 is the default, and the message must be atleast 1 byte large
