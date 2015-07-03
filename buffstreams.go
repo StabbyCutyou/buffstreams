@@ -235,7 +235,7 @@ func (bm *BuffManager) WriteTo(ip string, port string, data []byte, persist bool
 	written, err := conn.Write(toWrite)
 
 	if err != nil || persist == true {
-		err := bm.closeDialer(ip, port)
+		err = bm.closeDialer(ip, port)
 		conn = nil
 		if err != nil {
 			// TODO ponder the following:
