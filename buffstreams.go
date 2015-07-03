@@ -169,33 +169,32 @@ func readFromConnection(reader net.Conn, buffer []byte) (int, error) {
 	return bytesLen, nil
 }
 
-// If you want to dial out but not immediately write, use this method
-func (bm *BuffManager) DialOut(ip string, port string) error {
+func (bm *BuffManager) dialOut(ip string, port string) (*net.TCPConn, error) {
 	address := formatAddress(ip, port)
 	bm.RLock()
 	if _, ok := bm.dialedConnections[address]; ok == true {
 		bm.RUnlock()
 		// Need to clean it out on any error...
-		return errors.New("You have a connection to this ip and port open already")
+		return nil, errors.New("You have a connection to this ip and port open already")
 	}
 	bm.RUnlock()
 	tcpAddr, err := net.ResolveTCPAddr("tcp", address)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	conn, err := net.DialTCP("tcp", nil, tcpAddr)
 	if err != nil {
-		return err
+		return nil, err
 	} else {
 		// Store the connection, it's valid
 		bm.Lock()
 		bm.dialedConnections[address] = conn
 		bm.Unlock()
 	}
-	return nil
+	return conn, nil
 }
 
-func (bm *BuffManager) CloseDialer(ip string, port string) error {
+func (bm *BuffManager) closeDialer(ip string, port string) error {
 	address := formatAddress(ip, port)
 	bm.Lock()
 	if _, ok := bm.dialedConnections[address]; ok != true {
@@ -211,28 +210,33 @@ func (bm *BuffManager) CloseDialer(ip string, port string) error {
 // Write data and dial out if the conn isn't open
 func (bm *BuffManager) WriteTo(ip string, port string, data []byte, persist bool) (int, error) {
 	address := formatAddress(ip, port)
+
+	var conn net.Conn
+	var err error
+	var ok bool
+
 	// Get the connection if it's cached, or open a new one
 	bm.RLock()
-	if _, ok := bm.dialedConnections[address]; ok != true {
-		bm.RUnlock()
-		err := bm.DialOut(ip, port)
+	conn, ok = bm.dialedConnections[address]
+	bm.RUnlock()
+	if ok != true {
+		conn, err = bm.dialOut(ip, port)
 		if err != nil {
 			// Error dialing out, cannot write
 			// bail
 			return 0, err
 		}
-	} else {
-		bm.RUnlock()
 	}
 	// Calculate how big the message is, using a consistent header size.
 	toWriteLen := UInt16ToByteArray(uint16(len(data)), bm.MaxMessageSizeBitLength)
 	// Append the size to the message, so now it has a header
 	toWrite := append(toWriteLen, data...)
-	bm.Lock()
-	written, err := bm.dialedConnections[address].Write(toWrite)
-	bm.Unlock()
+	// Writes are threadsafe in net.Conns
+	written, err := conn.Write(toWrite)
+
 	if err != nil || persist == true {
-		err := bm.CloseDialer(ip, port)
+		err := bm.closeDialer(ip, port)
+		conn = nil
 		if err != nil {
 			// TODO ponder the following:
 			// Error closing the dialer, should we still return 0 written?
