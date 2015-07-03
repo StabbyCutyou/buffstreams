@@ -27,6 +27,8 @@ func main() {
 	}
 	count := 0
 	bm := buffstreams.New(cfg)
+	currentTime := time.Now()
+	lastTime := currentTime
 	for {
 		_, err := bm.WriteTo("127.0.0.1", strconv.Itoa(5031), msgBytes, true)
 		if err != nil {
@@ -34,6 +36,11 @@ func main() {
 			log.Print(err)
 		}
 		count = count + 1
-		log.Printf("%d - %d", 0, count)
+		if lastTime.Second() != currentTime.Second() {
+			lastTime = currentTime
+			log.Printf(", %d", count)
+			count = 0
+		}
+		currentTime = time.Now()
 	}
 }
