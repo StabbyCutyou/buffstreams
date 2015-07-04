@@ -11,8 +11,8 @@ import (
 )
 
 type BuffManager struct {
-	dialedConnections map[string]net.Conn
-	listeningSockets  map[string]net.Listener
+	dialedConnections map[string]*net.TCPConn
+	listeningSockets  map[string]*net.TCPListener
 	// TODO find a way to sanely provide this to a Dialer or a Receiver on a per-connection basis
 	MaxMessageSizeBitLength int
 	EnableLogging           bool
@@ -27,8 +27,8 @@ type BuffManagerConfig struct {
 
 func New(cfg BuffManagerConfig) *BuffManager {
 	bm := &BuffManager{
-		dialedConnections: make(map[string]net.Conn),
-		listeningSockets:  make(map[string]net.Listener),
+		dialedConnections: make(map[string]*net.TCPConn),
+		listeningSockets:  make(map[string]*net.TCPListener),
 		EnableLogging:     cfg.EnableLogging,
 	}
 	maxMessageSize := 4096
@@ -48,7 +48,8 @@ func formatAddress(address string, port string) string {
 
 func (bm *BuffManager) StartListening(port string, cb ListenCallback) error {
 	address := formatAddress("", port)
-	receiveSocket, err := net.Listen("tcp", address)
+	tcpAddr, err := net.ResolveTCPAddr("tcp", address)
+	receiveSocket, err := net.ListenTCP("tcp", tcpAddr)
 	if err != nil {
 		return err
 	}
@@ -56,7 +57,7 @@ func (bm *BuffManager) StartListening(port string, cb ListenCallback) error {
 	return nil
 }
 
-func (bm *BuffManager) startListening(address string, socket net.Listener, cb ListenCallback) {
+func (bm *BuffManager) startListening(address string, socket *net.TCPListener, cb ListenCallback) {
 	bm.Lock()
 	bm.listeningSockets[address] = socket
 	bm.Unlock()

@@ -1,7 +1,6 @@
-package test
+package main
 
 import (
-	"github.com/Sirupsen/logrus"
 	"github.com/StabbyCutyou/buffstreams"
 	"log"
 	"strconv"
@@ -15,8 +14,6 @@ func TestCallback(bts []byte) error {
 // This is not a proper test, but it lets me benchmark how it
 // performs on a raw level. Run this with the time command
 func main() {
-	logrus.SetLevel(logrus.DebugLevel)
-
 	cfg := buffstreams.BuffManagerConfig{
 		MaxMessageSize: 256,
 	}
