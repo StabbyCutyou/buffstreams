@@ -4,7 +4,6 @@ import (
 	"github.com/StabbyCutyou/buffstreams"
 	"github.com/StabbyCutyou/buffstreams/test/message"
 	"github.com/golang/protobuf/proto"
-	"log"
 	"strconv"
 	"time"
 )
