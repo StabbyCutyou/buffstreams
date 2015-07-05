@@ -157,6 +157,9 @@ func handleListenedConn(address string, conn net.Conn, maxMessageSize int, enabl
 			if err != nil && enableLogging == true {
 				log.Printf("Error in Callback")
 				log.Print(err)
+				// TODO if it's a protobuffs error, it means we likely had an issue and can't
+				// deserialize data? Should we kill the connection and have the client start over?
+				// At this point, there isn't a reliable recovery mechanic for the server
 			}
 		}
 	}
