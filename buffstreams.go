@@ -242,9 +242,9 @@ func (bm *BuffManager) WriteTo(address string, data []byte, persist bool) (int, 
 	// Writes are threadsafe in net.Conns
 	written, err := conn.Write(toWrite)
 
-	if err != nil || persist == true {
-		if bm.EnableLogging == true {
-			log.Printf("Error while writing data to %s")
+	if err != nil || persist == false {
+		if err != nil && bm.EnableLogging == true {
+			log.Printf("Error while writing data to %s", address)
 			log.Print(err)
 		}
 		err = bm.closeDialer(address)

@@ -19,7 +19,6 @@ func TestCallback(bts []byte) error {
 		log.Print("Error trying to unmarshall")
 		log.Print(err)
 	}
-	log.Print("Finished Callback")
 	return err
 }
 
