@@ -87,12 +87,17 @@ func handleListenedConn(address string, conn net.Conn, maxMessageSize int, enabl
 		headerByteSize := maxMessageSize
 		headerBuffer := make([]byte, headerByteSize)
 		// First, read the number of bytes required to determine the message length
-		_, err := readFromConnection(conn, headerBuffer)
-		if err != nil && err.Error() == "EOF" {
-			// Log the error we got from the call to read
+		bytesLen, err := readFromConnection(conn, headerBuffer)
+		if err != nil {
 			if enableLogging == true {
-				log.Printf("Address %s: Client closed connection", address)
-				log.Print(err)
+				if err.Error() != "EOF" {
+					// Log the error we got from the call to read
+					log.Print("Error when trying to read from address %s. Tried to read %d, actually read %d", address, headerByteSize, bytesLen)
+				} else {
+					// Client closed the conn
+					log.Printf("Address %s: Client closed connection", address)
+					log.Print(err)
+				}
 			}
 			conn.Close()
 			return
@@ -119,12 +124,18 @@ func handleListenedConn(address string, conn net.Conn, maxMessageSize int, enabl
 			return
 		}
 		dataBuffer := make([]byte, msgLength)
-		bytesLen, err := readFromConnection(conn, dataBuffer)
-		if err != nil && err.Error() == "EOF" {
-			// log the error from the call to read
+		bytesLen, err = readFromConnection(conn, dataBuffer)
+		if err != nil {
 			if enableLogging == true {
-				log.Printf("Address %s: Failure to read from connection", address)
-				log.Print(err)
+				if err.Error() != "EOF" {
+					// log the error from the call to read
+					log.Printf("Address %s: Failure to read from connection. Was told to read %d by the header, actually read %d", address, msgLength, bytesLen)
+					log.Print(err)
+				} else {
+					// The client wrote the header but closed the connection
+					log.Printf("Address %s: Client closed connection", address)
+					log.Print(err)
+				}
 			}
 			conn.Close()
 			return

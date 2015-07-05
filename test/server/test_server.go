@@ -14,11 +14,6 @@ import (
 func TestCallback(bts []byte) error {
 	msg := &message.Note{}
 	err := proto.Unmarshal(bts, msg)
-	if err != nil || msg == nil {
-		// Error decoding
-		log.Print("Error trying to unmarshall")
-		log.Print(err)
-	}
 	return err
 }
 
