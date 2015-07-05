@@ -24,9 +24,10 @@ func main() {
 		go func(n int, port string) {
 			bm := buffstreams.New(cfg)
 			bm.StartListening(strconv.Itoa(startingPort), TestCallback)
+			address := buffstreams.FormatAddress("127.0.0.1", strconv.Itoa(startingPort))
 			count := 0
 			for {
-				_, err := bm.WriteTo("127.0.0.1", strconv.Itoa(startingPort), msg, true)
+				_, err := bm.WriteTo(address, msg, true)
 				if err != nil {
 					log.Print("EEEEEERRRRROOOOOOOORRRRRRRRRRR")
 					log.Print(err)

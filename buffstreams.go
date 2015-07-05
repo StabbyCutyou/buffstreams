@@ -42,12 +42,14 @@ func New(cfg BuffManagerConfig) *BuffManager {
 
 type ListenCallback func([]byte) error
 
-func formatAddress(address string, port string) string {
+// Incase someone wants a programmtically correct way to format an address/port
+// for use with StartListening or WriteTo
+func FormatAddress(address string, port string) string {
 	return address + ":" + port
 }
 
 func (bm *BuffManager) StartListening(port string, cb ListenCallback) error {
-	address := formatAddress("", port)
+	address := FormatAddress("", port)
 	tcpAddr, err := net.ResolveTCPAddr("tcp", address)
 	receiveSocket, err := net.ListenTCP("tcp", tcpAddr)
 	if err != nil {
@@ -170,8 +172,7 @@ func readFromConnection(reader net.Conn, buffer []byte) (int, error) {
 	return bytesLen, nil
 }
 
-func (bm *BuffManager) dialOut(ip string, port string) (*net.TCPConn, error) {
-	address := formatAddress(ip, port)
+func (bm *BuffManager) dialOut(address string) (*net.TCPConn, error) {
 	bm.RLock()
 	if _, ok := bm.dialedConnections[address]; ok == true {
 		bm.RUnlock()
@@ -195,23 +196,29 @@ func (bm *BuffManager) dialOut(ip string, port string) (*net.TCPConn, error) {
 	return conn, nil
 }
 
-func (bm *BuffManager) closeDialer(ip string, port string) error {
-	address := formatAddress(ip, port)
-	bm.Lock()
-	if _, ok := bm.dialedConnections[address]; ok != true {
-		err := bm.dialedConnections[address].Close()
+// closeDialer uses explicit lock semantics vs defers to better control
+// when the lock gets released to reduce contention
+func (bm *BuffManager) closeDialer(address string) error {
+	// Get a read lock to look up that the connection exists
+	bm.RLock()
+	if conn, ok := bm.dialedConnections[address]; ok != true {
+		// Release immediately
+		bm.RUnlock()
+		err := conn.Close()
+		// Grab lock to delete from the map
+		bm.Lock()
 		delete(bm.dialedConnections, address)
+		// Release immediately
 		bm.Unlock()
 		return err
 	}
-	bm.Unlock()
+	// Release the lock incase it didn't exist
+	bm.RUnlock()
 	return nil
 }
 
 // Write data and dial out if the conn isn't open
-func (bm *BuffManager) WriteTo(ip string, port string, data []byte, persist bool) (int, error) {
-	address := formatAddress(ip, port)
-
+func (bm *BuffManager) WriteTo(address string, data []byte, persist bool) (int, error) {
 	var conn net.Conn
 	var err error
 	var ok bool
@@ -221,7 +228,7 @@ func (bm *BuffManager) WriteTo(ip string, port string, data []byte, persist bool
 	conn, ok = bm.dialedConnections[address]
 	bm.RUnlock()
 	if ok != true {
-		conn, err = bm.dialOut(ip, port)
+		conn, err = bm.dialOut(address)
 		if err != nil {
 			// Error dialing out, cannot write
 			// bail
@@ -236,7 +243,11 @@ func (bm *BuffManager) WriteTo(ip string, port string, data []byte, persist bool
 	written, err := conn.Write(toWrite)
 
 	if err != nil || persist == true {
-		err = bm.closeDialer(ip, port)
+		if bm.EnableLogging == true {
+			log.Printf("Error while writing data to %s")
+			log.Print(err)
+		}
+		err = bm.closeDialer(address)
 		conn = nil
 		if err != nil {
 			// TODO ponder the following:
@@ -246,7 +257,7 @@ func (bm *BuffManager) WriteTo(ip string, port string, data []byte, persist bool
 			// Possibilities for error not as complicated as i'm thinking?
 			if bm.EnableLogging == true {
 				// The error will get returned up the stack, no need to log it here?
-				log.Print("There was an error writing the message, and a subsequent error cleaning up the connection")
+				log.Print("There was a subsequent error cleaning up the connection to %s")
 			}
 			return 0, err
 		}
