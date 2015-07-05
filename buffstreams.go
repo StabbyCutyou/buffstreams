@@ -201,7 +201,7 @@ func (bm *BuffManager) dialOut(address string) (*net.TCPConn, error) {
 func (bm *BuffManager) closeDialer(address string) error {
 	// Get a read lock to look up that the connection exists
 	bm.RLock()
-	if conn, ok := bm.dialedConnections[address]; ok != true {
+	if conn, ok := bm.dialedConnections[address]; ok == true {
 		// Release immediately
 		bm.RUnlock()
 		err := conn.Close()
