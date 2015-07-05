@@ -29,8 +29,9 @@ func main() {
 	bm := buffstreams.New(cfg)
 	currentTime := time.Now()
 	lastTime := currentTime
+	address := buffstreams.FormatAddress("127.0.0.1", strconv.Itoa(5031))
 	for {
-		_, err := bm.WriteTo("127.0.0.1", strconv.Itoa(5031), msgBytes, true)
+		_, err := bm.WriteTo(address, msgBytes, true)
 		if err != nil {
 			log.Print("EEEEEERRRRROOOOOOOORRRRRRRRRRR")
 			log.Print(err)

@@ -1,7 +1,6 @@
-package test
+package main
 
 import (
-	"github.com/Sirupsen/logrus"
 	"github.com/StabbyCutyou/buffstreams"
 	"log"
 	"strconv"
@@ -15,8 +14,6 @@ func TestCallback(bts []byte) error {
 // This is not a proper test, but it lets me benchmark how it
 // performs on a raw level. Run this with the time command
 func main() {
-	logrus.SetLevel(logrus.DebugLevel)
-
 	cfg := buffstreams.BuffManagerConfig{
 		MaxMessageSize: 256,
 	}
@@ -27,9 +24,10 @@ func main() {
 		go func(n int, port string) {
 			bm := buffstreams.New(cfg)
 			bm.StartListening(strconv.Itoa(startingPort), TestCallback)
+			address := buffstreams.FormatAddress("127.0.0.1", strconv.Itoa(startingPort))
 			count := 0
 			for {
-				_, err := bm.WriteTo("127.0.0.1", strconv.Itoa(startingPort), msg, true)
+				_, err := bm.WriteTo(address, msg, true)
 				if err != nil {
 					log.Print("EEEEEERRRRROOOOOOOORRRRRRRRRRR")
 					log.Print(err)
