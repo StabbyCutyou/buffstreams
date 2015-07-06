@@ -160,6 +160,7 @@ func handleListenedConn(address string, conn net.Conn, maxMessageSize int, enabl
 				// TODO if it's a protobuffs error, it means we likely had an issue and can't
 				// deserialize data? Should we kill the connection and have the client start over?
 				// At this point, there isn't a reliable recovery mechanic for the server
+				// We could buffer bytes until a headersize + data work again... but thats hacky
 			}
 		}
 	}
@@ -181,6 +182,7 @@ func readFromConnection(reader net.Conn, buffer []byte) (int, error) {
 		//"Underlying network failure?"
 		// Not sure what this error would be, but it could exist and i've seen it handled
 		// as a general case in other networking code. Following in the footsteps of (greatness|madness)
+		return bytesLen, err
 	}
 	// Read some bytes, return the length
 	return bytesLen, nil
@@ -265,7 +267,6 @@ func (bm *BuffManager) WriteTo(address string, data []byte, persist bool) (int, 
 		conn = nil
 		if err != nil {
 			// TODO ponder the following:
-			// Error closing the dialer, should we still return 0 written?
 			// What if some bytes written, then failure, then also the close throws an error
 			// []error is a better return type, but not sure if thats a thing you're supposed to do...
 			// Possibilities for error not as complicated as i'm thinking?
@@ -273,7 +274,7 @@ func (bm *BuffManager) WriteTo(address string, data []byte, persist bool) (int, 
 				// The error will get returned up the stack, no need to log it here?
 				log.Print("There was a subsequent error cleaning up the connection to %s")
 			}
-			return 0, err
+			return written, err
 		}
 	}
 	// Return the bytes written, any error
