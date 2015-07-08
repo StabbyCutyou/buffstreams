@@ -1,39 +1,36 @@
 BuffStreams
 ====================
 
-Still actively in development. Real readme coming soon.
+Streaming Protocol Buffers messages over TCP in Golang
 
 What is BuffStreams?
 =====================
 
-It's a TCP connection manager for streaming Protobuffs, either in or out.
+BuffStreams is a manager for streaming TCP connections to a server that receives protocol buffers (or in the case of a non-protobuffs server, one that uses the same wire scheme of a fixed header + N bytes per message).
 
-That's it.
+BuffStreams gives you a simple interface to start a nonblocking listener on a given port, which will stream arrays of raw bytes into a callback you provide it. In this way, BuffStreams is not so much a daemon, but a library to build networked services that can  communicate over TCP using Protocol Buffer messages.
 
-Why ProtocolBuffers
+Why BuffStreams
 ====================
 
-I was writing a few different projects for fun in Go, and kept writing code something like what is in the library. I decided to just generalize my case a little bit with a function pointer, as 95% of the rest of the code was the same. It uses protobuffs for no reason other than that is what I'm using at the time.
+I was writing a few different projects for fun in Golang, and kept writing code something like what is in the library, but less organized. I decided to focus on the networking code, pulling it out and improving it so I knew it could be trusted to perform reliably across projects. 
 
-Since protobuff data lacks any kind of delimeter, you have a few options when it comes to sending messages in a streaming manner - provide your own delimeter, or use a pattern of sending a fixed set of bytes describing a message size, and a proceeding set of bytes as delimeted by the size in the header.
+How does it work?
+=================
 
-Buffstreams takes the latter approach for the time being. Maybe the other way is better. This is just what I did.
+Since protobuff messages lack any kind of natural delimeter, BuffStreams uses the method of adding a fixed header of bytes (which is configurable) that describes the size of the actual payload. This is handled for you, by the call to write. You never need to pack on the size yourself.
 
-Although - Nothing in BuffStreams actually uses protobuffs in any way. It's just the pattern I came up with for handling streaming protobuffs - you could probably use it with any format that needs you to calculate how big it is and send it as a header. That's probably a thing.
+On the server side, it will listen for these payloads, read the fixed header, and then the subsequent message. The server must have the same maximum size as the client for this to work. BuffStreams will then pass the byte array to a callback you provided for handling messages received on that port. Deserializing the messages and interpreting their value is up to you.
 
-What's it supposed to do?
-========================
-
-You can listen on ports, or dial out to other servers, and then keep a persistent connection where you shove data or pull data as fast as you can.
-
-Long term it'll do some work to try and maintain connections it's dialed out (or maybe not, maybe thats a bad idea).
-
-Really, who knows.
-
-An Apology
+Naming Strategy
 =======================
 
 I will apologize in advance for the pretty terrible names I chose for this library. It's way better than the original set of names I had for it. But that isn't saying much.
+
+Logging
+=======================
+
+You can optionally enable logging of errors, although this naturally comes with a performance penalty under extreme load.
 
 How do I use it?
 ===================
@@ -44,10 +41,17 @@ Import the library
 import "github.com/StabbyCutyou/buffstreams"
 ```
 
+Create a set of options for the BuffManager
+```go
+  cfg := buffstreams.BuffManagerConfig{
+    MaxMessageSize: 2048,
+    EnableLogging:  true,
+  }
+```
 BuffStreams is all about the BuffManager.
 
 ```go
-buffM := buffstreams.New()
+buffM := buffstreams.New(cfg)
 ```
 
 The BuffManager has one primary function managing two kinds of TCP connections (Reading and Writing), designed to handle streaming data in the protocol buffers format.
@@ -104,9 +108,3 @@ A sample callback might start like so:
 ```
 
 The callback is currently run in it's own goroutine, which also handles reading from the connection until the reader disconnects, or there is an error. Any errors reading from a connection incoming will be up to the client to handle.
-
-Logging
-=======================
-Logrus is in there right now (because it's great) to help me with testing.
-
-It wont necessarily be a real dependency of the library, I want to offer the ability to sub in your logger of choice along with a proper way to configure the BuffManager class itself.

@@ -246,6 +246,7 @@ func (bm *BuffManager) closeDialer(address string) error {
 }
 
 // Write data and dial out if the conn isn't open
+// TODO throw a fit if they try to write data > maxSize
 func (bm *BuffManager) WriteTo(address string, data []byte, persist bool) (int, error) {
 	var conn *net.TCPConn
 	var err error
