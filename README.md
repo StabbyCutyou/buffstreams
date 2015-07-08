@@ -6,7 +6,7 @@ Streaming Protocol Buffers messages over TCP in Golang
 What is BuffStreams?
 =====================
 
-BuffStreams is a manager for streaming TCP connections to a server that receives protocol buffers (or in the case of a non-protobuffs server, one that uses the same wire scheme of a fixed header + N bytes per message).
+BuffStreams is a manager for streaming TCP connections that write data in a format involving the length of the message + the message payload itself.
 
 BuffStreams gives you a simple interface to start a nonblocking listener on a given port, which will stream arrays of raw bytes into a callback you provide it. In this way, BuffStreams is not so much a daemon, but a library to build networked services that can  communicate over TCP using Protocol Buffer messages.
 
@@ -21,6 +21,10 @@ How does it work?
 Since protobuff messages lack any kind of natural delimeter, BuffStreams uses the method of adding a fixed header of bytes (which is configurable) that describes the size of the actual payload. This is handled for you, by the call to write. You never need to pack on the size yourself.
 
 On the server side, it will listen for these payloads, read the fixed header, and then the subsequent message. The server must have the same maximum size as the client for this to work. BuffStreams will then pass the byte array to a callback you provided for handling messages received on that port. Deserializing the messages and interpreting their value is up to you.
+
+One important note is that internally, BuffStreams does not actually use or rely on the Protocol Buffers library itself in any way. All serialization / deserialization is handled by the client prior to / after interactions with BuffStreams. In this way, you could theoretically use this library to stream any data over TCP that uses the same strategy of a fixed header of bytes + a subsequent message body. 
+
+Currently, I have only used it for ProtocolBuffers messages.
 
 Naming Strategy
 =======================
