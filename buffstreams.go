@@ -86,17 +86,26 @@ func handleListenedConn(address string, conn net.Conn, maxMessageSize int, enabl
 		// Handle getting the data header
 		headerByteSize := maxMessageSize
 		headerBuffer := make([]byte, headerByteSize)
+		//fullHeaderBuffer := make([]byte, 0)
+		var headerReadError error
+		var totalHeaderBytesRead = 0
+		var bytesRead = 0
 		// First, read the number of bytes required to determine the message length
-		bytesLen, err := readFromConnection(conn, headerBuffer)
-		if err != nil {
+		for totalHeaderBytesRead < headerByteSize && headerReadError == nil {
+			// While we haven't read enough yet, pass in the slice that represents where we are in the buffer
+			bytesRead, headerReadError = readFromConnection(conn, headerBuffer[totalHeaderBytesRead:])
+			totalHeaderBytesRead += bytesRead
+		}
+		if headerReadError != nil {
 			if enableLogging == true {
-				if err.Error() != "EOF" {
+				if headerReadError.Error() != "EOF" {
 					// Log the error we got from the call to read
-					log.Print("Error when trying to read from address %s. Tried to read %d, actually read %d", address, headerByteSize, bytesLen)
+					log.Print("Error when trying to read from address %s. Tried to read %d, actually read %d", address, headerByteSize, totalHeaderBytesRead)
+					log.Print(headerReadError)
 				} else {
 					// Client closed the conn
 					log.Printf("Address %s: Client closed connection", address)
-					log.Print(err)
+					log.Print(headerReadError)
 				}
 			}
 			conn.Close()
@@ -104,13 +113,14 @@ func handleListenedConn(address string, conn net.Conn, maxMessageSize int, enabl
 		}
 
 		// Now turn that buffer of bytes into an integer - represnts size of message body
+		//msgLength, bytesParsed := binary.Uvarint(fullHeaderBuffer)
 		msgLength, bytesParsed := binary.Uvarint(headerBuffer)
 		// Not sure what the correct way to handle these errors are. For now, bomb out
 		if bytesParsed == 0 {
 			// "Buffer too small"
 			if enableLogging == true {
 				log.Printf("Address %s: 0 Bytes parsed from header", address)
-				log.Print(err)
+				log.Print(headerReadError)
 			}
 			conn.Close()
 			return
@@ -118,23 +128,32 @@ func handleListenedConn(address string, conn net.Conn, maxMessageSize int, enabl
 			// "Buffer overflow"
 			if enableLogging == true {
 				log.Printf("Address %s: Buffer Less than zero bytes parsed from header", address)
-				log.Print(err)
+				log.Print(headerReadError)
 			}
 			conn.Close()
 			return
 		}
 		dataBuffer := make([]byte, msgLength)
-		bytesLen, err = readFromConnection(conn, dataBuffer)
-		if err != nil {
+		//fullDataBuffer := make([]byte, 0)
+		var dataReadError error
+		var totalDataBytesRead = 0
+		bytesRead = 0
+		for totalDataBytesRead < int(msgLength) && dataReadError == nil {
+			// While we haven't read enough yet, pass in the slice that represents where we are in the buffer
+			bytesRead, dataReadError = readFromConnection(conn, dataBuffer[totalDataBytesRead:])
+			totalDataBytesRead += bytesRead
+		}
+
+		if dataReadError != nil {
 			if enableLogging == true {
-				if err.Error() != "EOF" {
+				if dataReadError.Error() != "EOF" {
 					// log the error from the call to read
-					log.Printf("Address %s: Failure to read from connection. Was told to read %d by the header, actually read %d", address, msgLength, bytesLen)
-					log.Print(err)
+					log.Printf("Address %s: Failure to read from connection. Was told to read %d by the header, actually read %d", address, msgLength, totalDataBytesRead)
+					log.Print(dataReadError)
 				} else {
 					// The client wrote the header but closed the connection
 					log.Printf("Address %s: Client closed connection", address)
-					log.Print(err)
+					log.Print(dataReadError)
 				}
 			}
 			conn.Close()
@@ -144,23 +163,14 @@ func handleListenedConn(address string, conn net.Conn, maxMessageSize int, enabl
 		// If we read bytes, there wasn't an error, or if there was it was only EOF
 		// And readbytes + EOF is normal, just as readbytes + no err, next read 0 bytes EOF
 		// So... we take action on the actual message data
-		if bytesLen > 0 && (err == nil || (err != nil && err.Error() == "EOF")) {
-			// I ultimately have some design choices here
-			// Currently, I am invoking a delegate thats been passed down the stack
-			// I could...
-			// Just push it onto a queue (not a slow ass channel, but a queue)
-			// which has a reference passed down to it, and the main process
-			// spawns a goroutine to reap off the queue and handle those in parallel
-
-			// Callback, atm
-			err = cb(dataBuffer)
+		if totalDataBytesRead > 0 && (dataReadError == nil || (dataReadError != nil && dataReadError.Error() == "EOF")) {
+\			err := cb(dataBuffer)
 			if err != nil && enableLogging == true {
 				log.Printf("Error in Callback")
 				log.Print(err)
 				// TODO if it's a protobuffs error, it means we likely had an issue and can't
 				// deserialize data? Should we kill the connection and have the client start over?
 				// At this point, there isn't a reliable recovery mechanic for the server
-				// We could buffer bytes until a headersize + data work again... but thats hacky
 			}
 		}
 	}
@@ -234,8 +244,9 @@ func (bm *BuffManager) closeDialer(address string) error {
 }
 
 // Write data and dial out if the conn isn't open
+// TODO throw a fit if they try to write data > maxSize
 func (bm *BuffManager) WriteTo(address string, data []byte, persist bool) (int, error) {
-	var conn net.Conn
+	var conn *net.TCPConn
 	var err error
 	var ok bool
 
@@ -252,20 +263,51 @@ func (bm *BuffManager) WriteTo(address string, data []byte, persist bool) (int, 
 		}
 	}
 	// Calculate how big the message is, using a consistent header size.
-	toWriteLen := UInt16ToByteArray(uint16(len(data)), bm.MaxMessageSizeBitLength)
+	msgLenHeader := UInt16ToByteArray(uint16(len(data)), bm.MaxMessageSizeBitLength)
 	// Append the size to the message, so now it has a header
-	toWrite := append(toWriteLen, data...)
-	// Writes are threadsafe in net.Conns
-	written, err := conn.Write(toWrite)
+	toWrite := append(msgLenHeader, data...)
 
-	if err != nil || persist == false {
-		if err != nil && bm.EnableLogging == true {
-			log.Printf("Error while writing data to %s. Expected to write %d, actually wrote %d", address, len(toWrite), written)
-			log.Print(err)
+	toWriteLen := len(toWrite)
+
+	// Three conditions could have occured:
+	// 1. There was an error
+	// 2. Not all bytes were written
+	// 3. Both 1 and 2
+
+	// If there was an error, that should take handling precedence. If the connection
+	// was closed, or is otherwise in a bad state, we have to abort and re-open the connection
+	// to try again, as we can't realistically finish the write. We have to retry it, or return
+	// and error to the user?
+
+	// TODO configurable message retries
+
+	// If there was not an error, and we simply didn't finish the write, we should enter
+	// a write-until-complete loop, where we continue to write the data until the server accepts
+	// all of it.
+
+	// If both issues occurred, we'll need to find a way to determine if the error
+	// is recoverable (is the connection in a bad state) or not
+
+	var writeError error
+	var totalBytesWritten = 0
+	var bytesWritten = 0
+	// First, read the number of bytes required to determine the message length
+	for totalBytesWritten < toWriteLen && writeError == nil {
+		// While we haven't read enough yet
+		// If there are remainder bytes, adjust the contents of toWrite
+		// totalBytesWritten will be the index of the nextByte waiting to be read
+		bytesWritten, writeError = conn.Write(toWrite[totalBytesWritten:])
+		totalBytesWritten += bytesWritten
+	}
+
+	if writeError != nil || persist == false {
+		if writeError != nil && bm.EnableLogging == true {
+			log.Printf("Error while writing data to %s. Expected to write %d, actually wrote %d", address, len(toWrite), totalBytesWritten)
+			log.Print(writeError)
 		}
-		err = bm.closeDialer(address)
+		writeError = bm.closeDialer(address)
 		conn = nil
-		if err != nil {
+		if writeError != nil {
 			// TODO ponder the following:
 			// What if some bytes written, then failure, then also the close throws an error
 			// []error is a better return type, but not sure if thats a thing you're supposed to do...
@@ -274,9 +316,10 @@ func (bm *BuffManager) WriteTo(address string, data []byte, persist bool) (int, 
 				// The error will get returned up the stack, no need to log it here?
 				log.Print("There was a subsequent error cleaning up the connection to %s")
 			}
-			return written, err
+			return totalBytesWritten, writeError
 		}
 	}
+
 	// Return the bytes written, any error
-	return written, err
+	return totalBytesWritten, writeError
 }
