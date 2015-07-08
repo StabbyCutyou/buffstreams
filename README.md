@@ -59,7 +59,7 @@ Create a set of options for the BuffManager
     EnableLogging:  true,
   }
 ```
-BuffStreams is all about the BuffManager.
+Now, create a new BuffManager using those options.
 
 ```go
 buffM := buffstreams.New(cfg)
