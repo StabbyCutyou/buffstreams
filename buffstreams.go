@@ -164,15 +164,13 @@ func handleListenedConn(address string, conn net.Conn, maxMessageSize int, enabl
 		// And readbytes + EOF is normal, just as readbytes + no err, next read 0 bytes EOF
 		// So... we take action on the actual message data
 		if totalDataBytesRead > 0 && (dataReadError == nil || (dataReadError != nil && dataReadError.Error() == "EOF")) {
-			//err := cb(fullDataBuffer)
-			err := cb(dataBuffer)
+\			err := cb(dataBuffer)
 			if err != nil && enableLogging == true {
 				log.Printf("Error in Callback")
 				log.Print(err)
 				// TODO if it's a protobuffs error, it means we likely had an issue and can't
 				// deserialize data? Should we kill the connection and have the client start over?
 				// At this point, there isn't a reliable recovery mechanic for the server
-				// We could buffer bytes until a headersize + data work again... but thats hacky
 			}
 		}
 	}

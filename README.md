@@ -54,38 +54,46 @@ BuffStreams is all about the BuffManager.
 buffM := buffstreams.New(cfg)
 ```
 
-The BuffManager has one primary function managing two kinds of TCP connections (Reading and Writing), designed to handle streaming data in the protocol buffers format.
-
-The BuffManager can dial out to remote TCP endpoints
+From there, you can begin writing over a socket. You need an address in the format of "name:port". You can use a helper method to generate one, if you want
 
 ```go
-buffM.DialOut("127.0.0.1", "5031")
+  address := buffstreams.FormatAddress("127.0.0.1", strconv.Itoa(5031))
 ```
-It will store a reference to the connection internally, and synchronize access to it. In this way, a single BuffManager should be considered thread safe question marks???
 
-And either write in a single-message fashion (which closed the connection)
+Using BuffManager to Write Streaming Messages
+==============================================
+
+Once you have a BuffManager, you can now write data over the socket
 
 ```go
-  bytesWritten, err := buffM.WriteTo("127.0.0.1", "5031", msg, false)
+bytesWritten, err := bm.WriteTo(address, msgBytes, true)
 ```
 
-Or with a persistent connection in a streaming fashion
+BuffStreams will store a reference to the connection internally, and synchronize access to it. In this way, a single BuffManager should be considered safe to use across goroutines.
+
+The third argument to WriteTo controls whether or not to close the connection after the write. By keeping the connection open, you're able to treat the socket as a stream, continuously writing to it as fast as you can.
 
 ```go
   bytesWritten, err := buffM.WriteTo("127.0.0.1", "5031", msg, true)
 ```
 
-If there is an error in writing, that connection will be closed and removed from the collection.
+If you provide false, the connection is closed immediately after the write, and will be reopened the next time you attempt to use it. In this way, you can use BuffManager to make short, one time calls to other servers.
 
-On the next write attempt, it will be opened anew
+```go
+  bytesWritten, err := buffM.WriteTo("127.0.0.1", "5031", msg, false)
+```
 
-Additionally, BuffManager can listen on local ports for incoming requests. 
+If there is an error in writing, that connection will be closed and be reopened on the next write. There is no guarantee if any the bytesWritten value will be >0 or not.
+
+Using BuffManager to Receive Streaming Messages
+
+Additionally, a BuffManager can listen on local ports for incoming requests. 
 
 ```go
 buffM.StartListening("5031", ListenCallbackExample)
 ```
 
-Again, BuffManager will keep hold of this socket, and all incoming connections internally to itself. It is nonblocking, so your program or library must continue to run while BuffStreams is listening and handling connections. It is not a daemon.
+Again, BuffManager will keep hold of this socket, and all incoming connections internally to itself. It is nonblocking, so your program or library must continue to run while BuffStreams is listening and handling connections. It will not self-daemonize
 
 To listen requires a function delegate to be passed in, which meets the following interface:
 
@@ -108,3 +116,7 @@ A sample callback might start like so:
 ```
 
 The callback is currently run in it's own goroutine, which also handles reading from the connection until the reader disconnects, or there is an error. Any errors reading from a connection incoming will be up to the client to handle.
+
+LISCENSE
+=========
+Apache v2 - See LICENSE
