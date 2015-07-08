@@ -32,6 +32,13 @@ Logging
 
 You can optionally enable logging of errors, although this naturally comes with a performance penalty under extreme load.
 
+Benchmarks
+==========
+
+I've tried very hard to optimize BuffStreams as best as possible, striving to keep it's averages above 1M messages per second, with no errors during transit.
+
+See [Bench](http://github.com/StabbyCutyou/BENCH.md)
+
 How do I use it?
 ===================
 
@@ -93,7 +100,7 @@ Additionally, a BuffManager can listen on local ports for incoming requests.
 buffM.StartListening("5031", ListenCallbackExample)
 ```
 
-Again, BuffManager will keep hold of this socket, and all incoming connections internally to itself. It is nonblocking, so your program or library must continue to run while BuffStreams is listening and handling connections. It will not self-daemonize
+Again, BuffManager will keep hold of this socket, and all incoming connections internally to itself. It is nonblocking, so your program or library must continue to run while BuffStreams is listening and handling connections. It will not self-daemonize.
 
 To listen requires a function delegate to be passed in, which meets the following interface:
 
@@ -116,6 +123,15 @@ A sample callback might start like so:
 ```
 
 The callback is currently run in it's own goroutine, which also handles reading from the connection until the reader disconnects, or there is an error. Any errors reading from a connection incoming will be up to the client to handle.
+
+Roadmap
+=======
+* Release proper set of benchmarks, including more real-world cases
+* Further improvements to the readme
+* Further library optimizations via tools such as pprof
+* Reference implementation
+* Various TODO improvements littering the code to be taken care of
+* Have a proper Roadmap
 
 LISCENSE
 =========

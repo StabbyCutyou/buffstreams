@@ -86,7 +86,6 @@ func handleListenedConn(address string, conn net.Conn, maxMessageSize int, enabl
 		// Handle getting the data header
 		headerByteSize := maxMessageSize
 		headerBuffer := make([]byte, headerByteSize)
-		//fullHeaderBuffer := make([]byte, 0)
 		var headerReadError error
 		var totalHeaderBytesRead = 0
 		var bytesRead = 0
@@ -134,7 +133,6 @@ func handleListenedConn(address string, conn net.Conn, maxMessageSize int, enabl
 			return
 		}
 		dataBuffer := make([]byte, msgLength)
-		//fullDataBuffer := make([]byte, 0)
 		var dataReadError error
 		var totalDataBytesRead = 0
 		bytesRead = 0
