@@ -37,7 +37,7 @@ Benchmarks
 
 I've tried very hard to optimize BuffStreams as best as possible, striving to keep it's averages above 1M messages per second, with no errors during transit.
 
-See [Bench](http://github.com/StabbyCutyou/BENCH.md)
+See [Bench](https://github.com/StabbyCutyou/buffstreams/blob/master/BENCH.md)
 
 How do I use it?
 ===================
