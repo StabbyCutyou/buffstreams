@@ -164,7 +164,7 @@ func handleListenedConn(address string, conn net.Conn, maxMessageSize int, enabl
 		// And readbytes + EOF is normal, just as readbytes + no err, next read 0 bytes EOF
 		// So... we take action on the actual message data
 		if totalDataBytesRead > 0 && (dataReadError == nil || (dataReadError != nil && dataReadError.Error() == "EOF")) {
-\			err := cb(dataBuffer)
+			err := cb(dataBuffer)
 			if err != nil && enableLogging == true {
 				log.Printf("Error in Callback")
 				log.Print(err)
