@@ -20,9 +20,9 @@ type BuffManager struct {
 	dialedConnections map[string]*net.TCPConn
 	listeningSockets  map[string]*net.TCPListener
 	// TODO find a way to sanely provide this to a Dialer or a Receiver on a per-connection basis
+	// TODO I could control access to the maps better if I centralized how they got accessed - less locking code littered around
 	headerByteSize int
 	enableLogging  bool
-	// TODO I could control access to the maps better if I centralized how they got accessed - less locking code littered around
 	sync.RWMutex
 }
 
