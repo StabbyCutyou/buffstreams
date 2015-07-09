@@ -5,6 +5,7 @@ import ()
 import (
 	"encoding/binary"
 	"errors"
+	"io"
 	"log"
 	"net"
 	"sync"
@@ -51,6 +52,9 @@ func FormatAddress(address string, port string) string {
 func (bm *BuffManager) StartListening(port string, cb ListenCallback) error {
 	address := FormatAddress("", port)
 	tcpAddr, err := net.ResolveTCPAddr("tcp", address)
+	if err != nil {
+		return err
+	}
 	receiveSocket, err := net.ListenTCP("tcp", tcpAddr)
 	if err != nil {
 		return err
@@ -70,8 +74,7 @@ func (bm *BuffManager) startListening(address string, socket *net.TCPListener, c
 			conn, err := listener.Accept()
 			if err != nil {
 				if enableLogging == true {
-					log.Print("Error attempting to accept connection")
-					log.Print(err)
+					log.Printf("Error attempting to accept connection: %s", err)
 				}
 			} else {
 				// Hand this off and immediately listen for more
@@ -82,6 +85,9 @@ func (bm *BuffManager) startListening(address string, socket *net.TCPListener, c
 }
 
 func handleListenedConn(address string, conn net.Conn, maxMessageSize int, enableLogging bool, cb ListenCallback) {
+	// If there is any error, close the connection officially and break out of the listen-loop.
+	// We don't store these connections anywhere else, and if we can't recover from an error on the socket
+	// we want to kill the connection, exit the goroutine, and let the client handle re-connecting if need be.
 	for {
 		// Handle getting the data header
 		headerByteSize := maxMessageSize
@@ -97,7 +103,7 @@ func handleListenedConn(address string, conn net.Conn, maxMessageSize int, enabl
 		}
 		if headerReadError != nil {
 			if enableLogging == true {
-				if headerReadError.Error() != "EOF" {
+				if headerReadError != io.EOF {
 					// Log the error we got from the call to read
 					log.Print("Error when trying to read from address %s. Tried to read %d, actually read %d", address, headerByteSize, totalHeaderBytesRead)
 					log.Print(headerReadError)
@@ -144,14 +150,12 @@ func handleListenedConn(address string, conn net.Conn, maxMessageSize int, enabl
 
 		if dataReadError != nil {
 			if enableLogging == true {
-				if dataReadError.Error() != "EOF" {
+				if dataReadError != io.EOF {
 					// log the error from the call to read
-					log.Printf("Address %s: Failure to read from connection. Was told to read %d by the header, actually read %d", address, msgLength, totalDataBytesRead)
-					log.Print(dataReadError)
+					log.Printf("Address %s: Failure to read from connection. Was told to read %d by the header, actually read %d. Underlying error: %s", address, msgLength, totalDataBytesRead, dataReadError)
 				} else {
 					// The client wrote the header but closed the connection
-					log.Printf("Address %s: Client closed connection", address)
-					log.Print(dataReadError)
+					log.Printf("Address %s: Client closed connection. Underlying error: %s", address, dataReadError)
 				}
 			}
 			conn.Close()
@@ -164,8 +168,7 @@ func handleListenedConn(address string, conn net.Conn, maxMessageSize int, enabl
 		if totalDataBytesRead > 0 && (dataReadError == nil || (dataReadError != nil && dataReadError.Error() == "EOF")) {
 			err := cb(dataBuffer)
 			if err != nil && enableLogging == true {
-				log.Printf("Error in Callback")
-				log.Print(err)
+				log.Printf("Error in Callback: %s", err)
 				// TODO if it's a protobuffs error, it means we likely had an issue and can't
 				// deserialize data? Should we kill the connection and have the client start over?
 				// At this point, there isn't a reliable recovery mechanic for the server
@@ -179,7 +182,7 @@ func readFromConnection(reader net.Conn, buffer []byte) (int, error) {
 	bytesLen, err := reader.Read(buffer)
 	// Output the content of the bytes to the queue
 	if bytesLen == 0 {
-		if err != nil && err.Error() == "EOF" {
+		if err != nil && err == io.EOF {
 			// "End of individual transmission"
 			// We're just done reading from that conn
 			return bytesLen, err
@@ -197,35 +200,35 @@ func readFromConnection(reader net.Conn, buffer []byte) (int, error) {
 }
 
 func (bm *BuffManager) dialOut(address string) (*net.TCPConn, error) {
-	bm.RLock()
-	if _, ok := bm.dialedConnections[address]; ok == true {
-		bm.RUnlock()
-		// Need to clean it out on any error...
+	// We want to hold this lock for both the lookup as well as for setting it in the map
+	// Skipping defer for now, need to profile it's performance
+	bm.Lock()
+	if _, ok := bm.dialedConnections[address]; ok {
+		bm.Unlock()
 		return nil, errors.New("You have a connection to this ip and port open already")
 	}
-	bm.RUnlock()
 	tcpAddr, err := net.ResolveTCPAddr("tcp", address)
 	if err != nil {
+		bm.Unlock()
 		return nil, err
 	}
 	conn, err := net.DialTCP("tcp", nil, tcpAddr)
 	if err != nil {
+		bm.Unlock()
 		return nil, err
 	} else {
 		// Store the connection, it's valid
-		bm.Lock()
 		bm.dialedConnections[address] = conn
 		bm.Unlock()
 	}
 	return conn, nil
 }
 
-// closeDialer uses explicit lock semantics vs defers to better control
-// when the lock gets released to reduce contention
 func (bm *BuffManager) closeDialer(address string) error {
-	// Get a  lock to look up that the connection exists, and remove it
-	// Skip the read lock incase something tries to sneak in, inbetween R/W lock calls
 	bm.Lock()
+	// We want to hold this lock for both the lookup as well as the delete
+	// Either way, we can't release until we're ready to return.
+	//Skipping defer for now, need to profile it's performance
 	if conn, ok := bm.dialedConnections[address]; ok {
 		err := conn.Close()
 		// Grab lock to delete from the map
@@ -234,7 +237,6 @@ func (bm *BuffManager) closeDialer(address string) error {
 		bm.Unlock()
 		return err
 	}
-	// Release the lock incase it didn't exist
 	bm.Unlock()
 	return nil
 }
@@ -302,6 +304,7 @@ func (bm *BuffManager) WriteTo(address string, data []byte, persist bool) (int, 
 			log.Print(writeError)
 		}
 		writeError = bm.closeDialer(address)
+		// I probably don't need to nil the reference, but it helps me sleep at night
 		conn = nil
 		if writeError != nil {
 			// TODO ponder the following:
