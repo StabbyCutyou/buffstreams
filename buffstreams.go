@@ -11,6 +11,11 @@ import (
 	"sync"
 )
 
+// BuffManager represents the object used to govern interactions between tcp endpoints.
+// You can use it to read from and write to streaming or non-streaming TCP connections
+// and have it handle packaging data with a header describing the size of the data payload.
+// This is to make it easy to work with wire formats like ProtocolBuffers, which require
+// a custom-delimeter situation to be sent in a streaming fashion.
 type BuffManager struct {
 	dialedConnections map[string]*net.TCPConn
 	listeningSockets  map[string]*net.TCPListener
@@ -21,11 +26,16 @@ type BuffManager struct {
 	sync.RWMutex
 }
 
+// BuffManagerConfig represents a set of options that the person building systems ontop of
 type BuffManagerConfig struct {
+	// Controls how large the largest Message may be. The server will reject any messages whose clients
+	// header size does not match this configuration
 	MaxMessageSize int
-	EnableLogging  bool
+	// Controls the ability to enable logging errors occuring in the library
+	EnableLogging bool
 }
 
+// Creates a new *BuffManager based on the provided BuffManagerConfig
 func New(cfg BuffManagerConfig) *BuffManager {
 	bm := &BuffManager{
 		dialedConnections: make(map[string]*net.TCPConn),
@@ -41,14 +51,23 @@ func New(cfg BuffManagerConfig) *BuffManager {
 	return bm
 }
 
+// ListenCallback is a function type that calling code will need to implement in order
+// to receive arrays of bytes from the socket. Each slice of bytes will be stripped of the
+// size header, meaning you can directly serialize the raw slice. You would then perform your
+// custom logic for interpretting the message, before returning. You can optionally
+// return an error, which in turn will be logged if EnableLogging is set to true.
 type ListenCallback func([]byte) error
 
-// Incase someone wants a programmtically correct way to format an address/port
-// for use with StartListening or WriteTo
+// FormatAddress is to cover the event that you want/need a programmtically correct way
+// to format an address/port to use with StartListening or WriteTo
 func FormatAddress(address string, port string) string {
 	return address + ":" + port
 }
 
+// StartListening is an asyncrhonous, non-blocking method. It begins listening on the given
+// port, and will invoke the povided ListenCallback once it receives a full payload of bytes.
+// In the event of an transport error, it will disconnect the client. It is the clients responsibility
+// to re-connect if needed.
 func (bm *BuffManager) StartListening(port string, cb ListenCallback) error {
 	address := FormatAddress("", port)
 	tcpAddr, err := net.ResolveTCPAddr("tcp", address)
@@ -236,8 +255,11 @@ func (bm *BuffManager) closeDialer(address string) error {
 	return nil
 }
 
-// Write data and dial out if the conn isn't open
-// TODO throw a fit if they try to write data > maxSize
+// WriteTo allows you to dial to a remote or local TCP endpoint, and send either 1 or a stream
+// of bytes as messages. Each array of bytes you pass in will be pre-pended with it's size
+// within the size of the pre-defined maximum message size. If the connection isn't open yet,
+// WriteTo will open it, and cache it. If for anyreason the connection breaks, it will be disposed
+// and upon the next write, a new one will dial out.
 func (bm *BuffManager) WriteTo(address string, data []byte, persist bool) (int, error) {
 	var conn *net.TCPConn
 	var err error
@@ -295,8 +317,7 @@ func (bm *BuffManager) WriteTo(address string, data []byte, persist bool) (int, 
 
 	if writeError != nil || persist == false {
 		if writeError != nil && bm.enableLogging == true {
-			log.Printf("Error while writing data to %s. Expected to write %d, actually wrote %d", address, len(toWrite), totalBytesWritten)
-			log.Print(writeError)
+			log.Printf("Error while writing data to %s. Expected to write %d, actually wrote %d. Underlying error: %s", address, len(toWrite), totalBytesWritten, writeError)
 		}
 		writeError = bm.closeDialer(address)
 		if writeError != nil {

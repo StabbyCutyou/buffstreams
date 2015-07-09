@@ -1,4 +1,4 @@
-BuffStreams
+BuffStreams [![GoDoc](http://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)](http://godoc.org/github.com/StabbyCutyou/buffstreams)
 ====================
 
 Streaming Protocol Buffers messages over TCP in Golang
