@@ -105,12 +105,10 @@ func handleListenedConn(address string, conn net.Conn, maxMessageSize int, enabl
 			if enableLogging == true {
 				if headerReadError != io.EOF {
 					// Log the error we got from the call to read
-					log.Print("Error when trying to read from address %s. Tried to read %d, actually read %d", address, headerByteSize, totalHeaderBytesRead)
-					log.Print(headerReadError)
+					log.Print("Error when trying to read from address %s. Tried to read %d, actually read %d. Underlying error: %s", address, headerByteSize, totalHeaderBytesRead, headerReadError)
 				} else {
 					// Client closed the conn
-					log.Printf("Address %s: Client closed connection", address)
-					log.Print(headerReadError)
+					log.Printf("Address %s: Client closed connection. Underlying error: %s", address, headerReadError)
 				}
 			}
 			conn.Close()
@@ -118,22 +116,19 @@ func handleListenedConn(address string, conn net.Conn, maxMessageSize int, enabl
 		}
 
 		// Now turn that buffer of bytes into an integer - represnts size of message body
-		//msgLength, bytesParsed := binary.Uvarint(fullHeaderBuffer)
 		msgLength, bytesParsed := binary.Uvarint(headerBuffer)
 		// Not sure what the correct way to handle these errors are. For now, bomb out
 		if bytesParsed == 0 {
 			// "Buffer too small"
 			if enableLogging == true {
-				log.Printf("Address %s: 0 Bytes parsed from header", address)
-				log.Print(headerReadError)
+				log.Printf("Address %s: 0 Bytes parsed from header. Underlying error: %s", address, headerReadError)
 			}
 			conn.Close()
 			return
 		} else if bytesParsed < 0 {
 			// "Buffer overflow"
 			if enableLogging == true {
-				log.Printf("Address %s: Buffer Less than zero bytes parsed from header", address)
-				log.Print(headerReadError)
+				log.Printf("Address %s: Buffer Less than zero bytes parsed from header. Underlying error: %s", address, headerReadError)
 			}
 			conn.Close()
 			return
