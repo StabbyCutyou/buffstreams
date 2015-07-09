@@ -1,3 +1,6 @@
+// Package buffstreams provides a simple interface for creating and storing
+// sockets that have a pre-defined set of behaviors, making them simple to use
+// for consuming streaming protocol buffer messages over TCP
 package buffstreams
 
 import ()
@@ -36,7 +39,7 @@ type BuffManagerConfig struct {
 	EnableLogging bool
 }
 
-// Creates a new *BuffManager based on the provided BuffManagerConfig
+// New creates a new *BuffManager based on the provided BuffManagerConfig
 func New(cfg BuffManagerConfig) *BuffManager {
 	bm := &BuffManager{
 		dialedConnections: make(map[string]*net.TCPConn),
@@ -238,11 +241,11 @@ func (bm *BuffManager) dialOut(address string) (*net.TCPConn, error) {
 	if err != nil {
 		bm.Unlock()
 		return nil, err
-	} else {
-		// Store the connection, it's valid
-		bm.dialedConnections[address] = conn
-		bm.Unlock()
 	}
+
+	// Store the connection, it's valid
+	bm.dialedConnections[address] = conn
+	bm.Unlock()
 	return conn, nil
 }
 
