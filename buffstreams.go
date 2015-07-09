@@ -47,7 +47,7 @@ func New(cfg BuffManagerConfig) *BuffManager {
 	if cfg.MaxMessageSize != 0 {
 		maxMessageSize = cfg.MaxMessageSize
 	}
-	bm.maxMessageSizeBitLength = MessageSizeToBitLength(maxMessageSize)
+	bm.maxMessageSizeBitLength = messageSizeToBitLength(maxMessageSize)
 	return bm
 }
 
@@ -278,7 +278,7 @@ func (bm *BuffManager) WriteTo(address string, data []byte, persist bool) (int, 
 		}
 	}
 	// Calculate how big the message is, using a consistent header size.
-	msgLenHeader := UInt16ToByteArray(uint16(len(data)), bm.maxMessageSizeBitLength)
+	msgLenHeader := uInt16ToByteArray(uint16(len(data)), bm.maxMessageSizeBitLength)
 	// Append the size to the message, so now it has a header
 	toWrite := append(msgLenHeader, data...)
 
