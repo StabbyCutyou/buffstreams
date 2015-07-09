@@ -223,21 +223,19 @@ func (bm *BuffManager) dialOut(address string) (*net.TCPConn, error) {
 // closeDialer uses explicit lock semantics vs defers to better control
 // when the lock gets released to reduce contention
 func (bm *BuffManager) closeDialer(address string) error {
-	// Get a read lock to look up that the connection exists
-	bm.RLock()
-	if conn, ok := bm.dialedConnections[address]; ok == true {
-		// Release immediately
-		bm.RUnlock()
+	// Get a  lock to look up that the connection exists, and remove it
+	// Skip the read lock incase something tries to sneak in, inbetween R/W lock calls
+	bm.Lock()
+	if conn, ok := bm.dialedConnections[address]; ok {
 		err := conn.Close()
 		// Grab lock to delete from the map
-		bm.Lock()
 		delete(bm.dialedConnections, address)
 		// Release immediately
 		bm.Unlock()
 		return err
 	}
 	// Release the lock incase it didn't exist
-	bm.RUnlock()
+	bm.Unlock()
 	return nil
 }
 
