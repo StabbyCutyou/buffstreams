@@ -22,6 +22,7 @@ type BuffManager struct {
 	// TODO find a way to sanely provide this to a Dialer or a Receiver on a per-connection basis
 	// TODO I could control access to the maps better if I centralized how they got accessed - less locking code littered around
 	headerByteSize int
+	maxMessageSize int
 	enableLogging  bool
 	sync.RWMutex
 }
@@ -47,6 +48,7 @@ func New(cfg BuffManagerConfig) *BuffManager {
 	if cfg.MaxMessageSize != 0 {
 		maxMessageSize = cfg.MaxMessageSize
 	}
+	bm.maxMessageSize = maxMessageSize
 	bm.headerByteSize = messageSizeToBitLength(maxMessageSize)
 	return bm
 }
@@ -88,7 +90,7 @@ func (bm *BuffManager) startListening(address string, socket *net.TCPListener, c
 	bm.listeningSockets[address] = socket
 	bm.Unlock()
 
-	go func(address string, headerByteSize int, enableLogging bool, listener net.Listener) {
+	go func(address string, headerByteSize int, maxMessageSize int, enableLogging bool, listener net.Listener) {
 		for {
 			// Wait for someone to connect
 			conn, err := listener.Accept()
@@ -98,13 +100,13 @@ func (bm *BuffManager) startListening(address string, socket *net.TCPListener, c
 				}
 			} else {
 				// Hand this off and immediately listen for more
-				go handleListenedConn(address, conn, headerByteSize, enableLogging, cb)
+				go handleListenedConn(address, conn, headerByteSize, maxMessageSize, enableLogging, cb)
 			}
 		}
-	}(address, bm.headerByteSize, bm.enableLogging, socket)
+	}(address, bm.headerByteSize, bm.maxMessageSize, bm.enableLogging, socket)
 }
 
-func handleListenedConn(address string, conn net.Conn, headerByteSize int, enableLogging bool, cb ListenCallback) {
+func handleListenedConn(address string, conn net.Conn, headerByteSize int, maxMessageSize int, enableLogging bool, cb ListenCallback) {
 	// If there is any error, close the connection officially and break out of the listen-loop.
 	// We don't store these connections anywhere else, and if we can't recover from an error on the socket
 	// we want to kill the connection, exit the goroutine, and let the client handle re-connecting if need be.
@@ -114,6 +116,7 @@ func handleListenedConn(address string, conn net.Conn, headerByteSize int, enabl
 	// to read, and we always pass in a slice the size of the total bytes read so far, so there should
 	// never be any resultant cross-contamination from earlier runs of the loop.
 	headerBuffer := make([]byte, headerByteSize)
+	dataBuffer := make([]byte, maxMessageSize)
 	for {
 		var headerReadError error
 		var totalHeaderBytesRead = 0
@@ -140,6 +143,7 @@ func handleListenedConn(address string, conn net.Conn, headerByteSize int, enabl
 
 		// Now turn that buffer of bytes into an integer - represnts size of message body
 		msgLength, bytesParsed := binary.Uvarint(headerBuffer)
+		iMsgLength := int(msgLength)
 		// Not sure what the correct way to handle these errors are. For now, bomb out
 		if bytesParsed == 0 {
 			// "Buffer too small"
@@ -156,13 +160,13 @@ func handleListenedConn(address string, conn net.Conn, headerByteSize int, enabl
 			conn.Close()
 			return
 		}
-		dataBuffer := make([]byte, msgLength)
+
 		var dataReadError error
 		var totalDataBytesRead = 0
 		bytesRead = 0
-		for totalDataBytesRead < int(msgLength) && dataReadError == nil {
+		for totalDataBytesRead < iMsgLength && dataReadError == nil {
 			// While we haven't read enough yet, pass in the slice that represents where we are in the buffer
-			bytesRead, dataReadError = readFromConnection(conn, dataBuffer[totalDataBytesRead:])
+			bytesRead, dataReadError = readFromConnection(conn, dataBuffer[totalDataBytesRead:iMsgLength])
 			totalDataBytesRead += bytesRead
 		}
 
@@ -183,8 +187,8 @@ func handleListenedConn(address string, conn net.Conn, headerByteSize int, enabl
 		// If we read bytes, there wasn't an error, or if there was it was only EOF
 		// And readbytes + EOF is normal, just as readbytes + no err, next read 0 bytes EOF
 		// So... we take action on the actual message data
-		if totalDataBytesRead > 0 && (dataReadError == nil || (dataReadError != nil && dataReadError.Error() == "EOF")) {
-			err := cb(dataBuffer)
+		if totalDataBytesRead == 0 && (dataReadError == nil || (dataReadError != nil && dataReadError == io.EOF)) {
+			err := cb(dataBuffer[:iMsgLength])
 			if err != nil && enableLogging {
 				log.Printf("Error in Callback: %s", err)
 				// TODO if it's a protobuffs error, it means we likely had an issue and can't
