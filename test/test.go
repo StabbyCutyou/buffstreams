@@ -16,27 +16,28 @@ func TestCallback(bts []byte) error {
 func main() {
 	cfg := buffstreams.BuffManagerConfig{
 		MaxMessageSize: 256,
+		EnableLogging:  true,
 	}
 	// 100 byte message
 	msg := []byte("HeyheyheyHeyheyheyHeyheyheyHeyheyheyHeyheyheyHeyheyheyHeyheyheyHeyheyheyHeyheyheyHeyheyheyHeyheyheyH!")
 	startingPort := 5031
+	bm := buffstreams.New(cfg)
+	bm.StartListening(strconv.Itoa(startingPort), TestCallback)
+
 	for i := 0; i < 10; i++ {
-		go func(n int, port string) {
-			bm := buffstreams.New(cfg)
-			bm.StartListening(strconv.Itoa(startingPort), TestCallback)
-			address := buffstreams.FormatAddress("127.0.0.1", strconv.Itoa(startingPort))
+		go func(n int, port string, bm *buffstreams.BuffManager) {
+			address := buffstreams.FormatAddress("127.0.0.1", port)
 			count := 0
 			for {
 				_, err := bm.WriteTo(address, msg, true)
 				if err != nil {
-					log.Print("EEEEEERRRRROOOOOOOORRRRRRRRRRR")
-					log.Print(err)
+					log.Printf("Error %s", err)
 				}
 				count = count + 1
 				log.Printf("%d - %d", n, count)
 			}
-		}(i, strconv.Itoa(startingPort))
-		startingPort = startingPort + 1
+		}(i, strconv.Itoa(startingPort), bm)
+		//startingPort = startingPort + 1
 	}
 	time.Sleep(time.Minute * 10)
 }

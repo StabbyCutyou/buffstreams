@@ -5,52 +5,76 @@ import ()
 import (
 	"encoding/binary"
 	"errors"
+	"io"
 	"log"
 	"net"
 	"sync"
 )
 
+// BuffManager represents the object used to govern interactions between tcp endpoints.
+// You can use it to read from and write to streaming or non-streaming TCP connections
+// and have it handle packaging data with a header describing the size of the data payload.
+// This is to make it easy to work with wire formats like ProtocolBuffers, which require
+// a custom-delimeter situation to be sent in a streaming fashion.
 type BuffManager struct {
 	dialedConnections map[string]*net.TCPConn
 	listeningSockets  map[string]*net.TCPListener
 	// TODO find a way to sanely provide this to a Dialer or a Receiver on a per-connection basis
-	MaxMessageSizeBitLength int
-	EnableLogging           bool
+	headerByteSize int
+	enableLogging  bool
 	// TODO I could control access to the maps better if I centralized how they got accessed - less locking code littered around
 	sync.RWMutex
 }
 
+// BuffManagerConfig represents a set of options that the person building systems ontop of
 type BuffManagerConfig struct {
+	// Controls how large the largest Message may be. The server will reject any messages whose clients
+	// header size does not match this configuration
 	MaxMessageSize int
-	EnableLogging  bool
+	// Controls the ability to enable logging errors occuring in the library
+	EnableLogging bool
 }
 
+// Creates a new *BuffManager based on the provided BuffManagerConfig
 func New(cfg BuffManagerConfig) *BuffManager {
 	bm := &BuffManager{
 		dialedConnections: make(map[string]*net.TCPConn),
 		listeningSockets:  make(map[string]*net.TCPListener),
-		EnableLogging:     cfg.EnableLogging,
+		enableLogging:     cfg.EnableLogging,
 	}
 	maxMessageSize := 4096
 	// 0 is the default, and the message must be atleast 1 byte large
 	if cfg.MaxMessageSize != 0 {
 		maxMessageSize = cfg.MaxMessageSize
 	}
-	bm.MaxMessageSizeBitLength = MessageSizeToBitLength(maxMessageSize)
+	bm.headerByteSize = messageSizeToBitLength(maxMessageSize)
 	return bm
 }
 
+// ListenCallback is a function type that calling code will need to implement in order
+// to receive arrays of bytes from the socket. Each slice of bytes will be stripped of the
+// size header, meaning you can directly serialize the raw slice. You would then perform your
+// custom logic for interpretting the message, before returning. You can optionally
+// return an error, which in turn will be logged if EnableLogging is set to true.
 type ListenCallback func([]byte) error
 
-// Incase someone wants a programmtically correct way to format an address/port
-// for use with StartListening or WriteTo
+// FormatAddress is to cover the event that you want/need a programmtically correct way
+// to format an address/port to use with StartListening or WriteTo
 func FormatAddress(address string, port string) string {
 	return address + ":" + port
 }
 
+// StartListening is an asyncrhonous, non-blocking method. It begins listening on the given
+// port, and fire off a goroutine for every client connection it receives. That goroutine will
+// read the fixed header, then the message payload, and then invoke the povided ListenCallbacl.
+// In the event of an transport error, it will disconnect the client. It is the clients responsibility
+// to re-connect if needed.
 func (bm *BuffManager) StartListening(port string, cb ListenCallback) error {
 	address := FormatAddress("", port)
 	tcpAddr, err := net.ResolveTCPAddr("tcp", address)
+	if err != nil {
+		return err
+	}
 	receiveSocket, err := net.ListenTCP("tcp", tcpAddr)
 	if err != nil {
 		return err
@@ -64,28 +88,33 @@ func (bm *BuffManager) startListening(address string, socket *net.TCPListener, c
 	bm.listeningSockets[address] = socket
 	bm.Unlock()
 
-	go func(address string, maxMessageSizeBitLength int, enableLogging bool, listener net.Listener) {
+	go func(address string, headerByteSize int, enableLogging bool, listener net.Listener) {
 		for {
 			// Wait for someone to connect
 			conn, err := listener.Accept()
 			if err != nil {
-				if enableLogging == true {
-					log.Print("Error attempting to accept connection")
-					log.Print(err)
+				if enableLogging {
+					log.Printf("Error attempting to accept connection: %s", err)
 				}
 			} else {
 				// Hand this off and immediately listen for more
-				go handleListenedConn(address, conn, bm.MaxMessageSizeBitLength, enableLogging, cb)
+				go handleListenedConn(address, conn, headerByteSize, enableLogging, cb)
 			}
 		}
-	}(address, bm.MaxMessageSizeBitLength, bm.EnableLogging, socket)
+	}(address, bm.headerByteSize, bm.enableLogging, socket)
 }
 
-func handleListenedConn(address string, conn net.Conn, maxMessageSize int, enableLogging bool, cb ListenCallback) {
+func handleListenedConn(address string, conn net.Conn, headerByteSize int, enableLogging bool, cb ListenCallback) {
+	// If there is any error, close the connection officially and break out of the listen-loop.
+	// We don't store these connections anywhere else, and if we can't recover from an error on the socket
+	// we want to kill the connection, exit the goroutine, and let the client handle re-connecting if need be.
+	// Handle getting the data header
+
+	// We can cheat a tiny bit here, and only allocate this buffer one time. It will be overwritten on each call
+	// to read, and we always pass in a slice the size of the total bytes read so far, so there should
+	// never be any resultant cross-contamination from earlier runs of the loop.
+	headerBuffer := make([]byte, headerByteSize)
 	for {
-		// Handle getting the data header
-		headerByteSize := maxMessageSize
-		headerBuffer := make([]byte, headerByteSize)
 		var headerReadError error
 		var totalHeaderBytesRead = 0
 		var bytesRead = 0
@@ -96,15 +125,13 @@ func handleListenedConn(address string, conn net.Conn, maxMessageSize int, enabl
 			totalHeaderBytesRead += bytesRead
 		}
 		if headerReadError != nil {
-			if enableLogging == true {
-				if headerReadError.Error() != "EOF" {
+			if enableLogging {
+				if headerReadError != io.EOF {
 					// Log the error we got from the call to read
-					log.Print("Error when trying to read from address %s. Tried to read %d, actually read %d", address, headerByteSize, totalHeaderBytesRead)
-					log.Print(headerReadError)
+					log.Print("Error when trying to read from address %s. Tried to read %d, actually read %d. Underlying error: %s", address, headerByteSize, totalHeaderBytesRead, headerReadError)
 				} else {
 					// Client closed the conn
-					log.Printf("Address %s: Client closed connection", address)
-					log.Print(headerReadError)
+					log.Printf("Address %s: Client closed connection. Underlying error: %s", address, headerReadError)
 				}
 			}
 			conn.Close()
@@ -112,22 +139,19 @@ func handleListenedConn(address string, conn net.Conn, maxMessageSize int, enabl
 		}
 
 		// Now turn that buffer of bytes into an integer - represnts size of message body
-		//msgLength, bytesParsed := binary.Uvarint(fullHeaderBuffer)
 		msgLength, bytesParsed := binary.Uvarint(headerBuffer)
 		// Not sure what the correct way to handle these errors are. For now, bomb out
 		if bytesParsed == 0 {
 			// "Buffer too small"
-			if enableLogging == true {
-				log.Printf("Address %s: 0 Bytes parsed from header", address)
-				log.Print(headerReadError)
+			if enableLogging {
+				log.Printf("Address %s: 0 Bytes parsed from header. Underlying error: %s", address, headerReadError)
 			}
 			conn.Close()
 			return
 		} else if bytesParsed < 0 {
 			// "Buffer overflow"
-			if enableLogging == true {
-				log.Printf("Address %s: Buffer Less than zero bytes parsed from header", address)
-				log.Print(headerReadError)
+			if enableLogging {
+				log.Printf("Address %s: Buffer Less than zero bytes parsed from header. Underlying error: %s", address, headerReadError)
 			}
 			conn.Close()
 			return
@@ -143,15 +167,13 @@ func handleListenedConn(address string, conn net.Conn, maxMessageSize int, enabl
 		}
 
 		if dataReadError != nil {
-			if enableLogging == true {
-				if dataReadError.Error() != "EOF" {
+			if enableLogging {
+				if dataReadError != io.EOF {
 					// log the error from the call to read
-					log.Printf("Address %s: Failure to read from connection. Was told to read %d by the header, actually read %d", address, msgLength, totalDataBytesRead)
-					log.Print(dataReadError)
+					log.Printf("Address %s: Failure to read from connection. Was told to read %d by the header, actually read %d. Underlying error: %s", address, msgLength, totalDataBytesRead, dataReadError)
 				} else {
 					// The client wrote the header but closed the connection
-					log.Printf("Address %s: Client closed connection", address)
-					log.Print(dataReadError)
+					log.Printf("Address %s: Client closed connection. Underlying error: %s", address, dataReadError)
 				}
 			}
 			conn.Close()
@@ -163,9 +185,8 @@ func handleListenedConn(address string, conn net.Conn, maxMessageSize int, enabl
 		// So... we take action on the actual message data
 		if totalDataBytesRead > 0 && (dataReadError == nil || (dataReadError != nil && dataReadError.Error() == "EOF")) {
 			err := cb(dataBuffer)
-			if err != nil && enableLogging == true {
-				log.Printf("Error in Callback")
-				log.Print(err)
+			if err != nil && enableLogging {
+				log.Printf("Error in Callback: %s", err)
 				// TODO if it's a protobuffs error, it means we likely had an issue and can't
 				// deserialize data? Should we kill the connection and have the client start over?
 				// At this point, there isn't a reliable recovery mechanic for the server
@@ -179,7 +200,7 @@ func readFromConnection(reader net.Conn, buffer []byte) (int, error) {
 	bytesLen, err := reader.Read(buffer)
 	// Output the content of the bytes to the queue
 	if bytesLen == 0 {
-		if err != nil && err.Error() == "EOF" {
+		if err != nil && err == io.EOF {
 			// "End of individual transmission"
 			// We're just done reading from that conn
 			return bytesLen, err
@@ -197,52 +218,52 @@ func readFromConnection(reader net.Conn, buffer []byte) (int, error) {
 }
 
 func (bm *BuffManager) dialOut(address string) (*net.TCPConn, error) {
-	bm.RLock()
-	if _, ok := bm.dialedConnections[address]; ok == true {
-		bm.RUnlock()
-		// Need to clean it out on any error...
+	// We want to hold this lock for both the lookup as well as for setting it in the map
+	// Skipping defer for now, need to profile it's performance
+	bm.Lock()
+	if _, ok := bm.dialedConnections[address]; ok {
+		bm.Unlock()
 		return nil, errors.New("You have a connection to this ip and port open already")
 	}
-	bm.RUnlock()
 	tcpAddr, err := net.ResolveTCPAddr("tcp", address)
 	if err != nil {
+		bm.Unlock()
 		return nil, err
 	}
 	conn, err := net.DialTCP("tcp", nil, tcpAddr)
 	if err != nil {
+		bm.Unlock()
 		return nil, err
 	} else {
 		// Store the connection, it's valid
-		bm.Lock()
 		bm.dialedConnections[address] = conn
 		bm.Unlock()
 	}
 	return conn, nil
 }
 
-// closeDialer uses explicit lock semantics vs defers to better control
-// when the lock gets released to reduce contention
 func (bm *BuffManager) closeDialer(address string) error {
-	// Get a read lock to look up that the connection exists
-	bm.RLock()
-	if conn, ok := bm.dialedConnections[address]; ok == true {
-		// Release immediately
-		bm.RUnlock()
+	bm.Lock()
+	// We want to hold this lock for both the lookup as well as the delete
+	// Either way, we can't release until we're ready to return.
+	//Skipping defer for now, need to profile it's performance
+	if conn, ok := bm.dialedConnections[address]; ok {
 		err := conn.Close()
 		// Grab lock to delete from the map
-		bm.Lock()
 		delete(bm.dialedConnections, address)
 		// Release immediately
 		bm.Unlock()
 		return err
 	}
-	// Release the lock incase it didn't exist
-	bm.RUnlock()
+	bm.Unlock()
 	return nil
 }
 
-// Write data and dial out if the conn isn't open
-// TODO throw a fit if they try to write data > maxSize
+// WriteTo allows you to dial to a remote or local TCP endpoint, and send either 1 or a stream
+// of bytes as messages. Each array of bytes you pass in will be pre-pended with it's size
+// within the size of the pre-defined maximum message size. If the connection isn't open yet,
+// WriteTo will open it, and cache it. If for anyreason the connection breaks, it will be disposed
+// and upon the next write, a new one will dial out.
 func (bm *BuffManager) WriteTo(address string, data []byte, persist bool) (int, error) {
 	var conn *net.TCPConn
 	var err error
@@ -252,7 +273,7 @@ func (bm *BuffManager) WriteTo(address string, data []byte, persist bool) (int, 
 	bm.RLock()
 	conn, ok = bm.dialedConnections[address]
 	bm.RUnlock()
-	if ok != true {
+	if !ok {
 		conn, err = bm.dialOut(address)
 		if err != nil {
 			// Error dialing out, cannot write
@@ -261,7 +282,7 @@ func (bm *BuffManager) WriteTo(address string, data []byte, persist bool) (int, 
 		}
 	}
 	// Calculate how big the message is, using a consistent header size.
-	msgLenHeader := UInt16ToByteArray(uint16(len(data)), bm.MaxMessageSizeBitLength)
+	msgLenHeader := uInt16ToByteArray(uint16(len(data)), bm.headerByteSize)
 	// Append the size to the message, so now it has a header
 	toWrite := append(msgLenHeader, data...)
 
@@ -298,19 +319,17 @@ func (bm *BuffManager) WriteTo(address string, data []byte, persist bool) (int, 
 		totalBytesWritten += bytesWritten
 	}
 
-	if writeError != nil || persist == false {
-		if writeError != nil && bm.EnableLogging == true {
-			log.Printf("Error while writing data to %s. Expected to write %d, actually wrote %d", address, len(toWrite), totalBytesWritten)
-			log.Print(writeError)
+	if writeError != nil || persist {
+		if writeError != nil && bm.enableLogging {
+			log.Printf("Error while writing data to %s. Expected to write %d, actually wrote %d. Underlying error: %s", address, len(toWrite), totalBytesWritten, writeError)
 		}
 		writeError = bm.closeDialer(address)
-		conn = nil
 		if writeError != nil {
 			// TODO ponder the following:
 			// What if some bytes written, then failure, then also the close throws an error
 			// []error is a better return type, but not sure if thats a thing you're supposed to do...
 			// Possibilities for error not as complicated as i'm thinking?
-			if bm.EnableLogging == true {
+			if bm.enableLogging {
 				// The error will get returned up the stack, no need to log it here?
 				log.Print("There was a subsequent error cleaning up the connection to %s")
 			}
