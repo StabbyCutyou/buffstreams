@@ -65,7 +65,8 @@ func FormatAddress(address string, port string) string {
 }
 
 // StartListening is an asyncrhonous, non-blocking method. It begins listening on the given
-// port, and will invoke the povided ListenCallback once it receives a full payload of bytes.
+// port, and fire off a goroutine for every client connection it receives. That goroutine will
+// read the fixed header, then the message payload, and then invoke the povided ListenCallbacl.
 // In the event of an transport error, it will disconnect the client. It is the clients responsibility
 // to re-connect if needed.
 func (bm *BuffManager) StartListening(port string, cb ListenCallback) error {
