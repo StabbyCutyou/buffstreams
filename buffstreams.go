@@ -299,8 +299,6 @@ func (bm *BuffManager) WriteTo(address string, data []byte, persist bool) (int, 
 			log.Print(writeError)
 		}
 		writeError = bm.closeDialer(address)
-		// I probably don't need to nil the reference, but it helps me sleep at night
-		conn = nil
 		if writeError != nil {
 			// TODO ponder the following:
 			// What if some bytes written, then failure, then also the close throws an error
