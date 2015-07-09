@@ -15,8 +15,8 @@ type BuffManager struct {
 	dialedConnections map[string]*net.TCPConn
 	listeningSockets  map[string]*net.TCPListener
 	// TODO find a way to sanely provide this to a Dialer or a Receiver on a per-connection basis
-	MaxMessageSizeBitLength int
-	EnableLogging           bool
+	maxMessageSizeBitLength int
+	enableLogging           bool
 	// TODO I could control access to the maps better if I centralized how they got accessed - less locking code littered around
 	sync.RWMutex
 }
@@ -30,14 +30,14 @@ func New(cfg BuffManagerConfig) *BuffManager {
 	bm := &BuffManager{
 		dialedConnections: make(map[string]*net.TCPConn),
 		listeningSockets:  make(map[string]*net.TCPListener),
-		EnableLogging:     cfg.EnableLogging,
+		enableLogging:     cfg.EnableLogging,
 	}
 	maxMessageSize := 4096
 	// 0 is the default, and the message must be atleast 1 byte large
 	if cfg.MaxMessageSize != 0 {
 		maxMessageSize = cfg.MaxMessageSize
 	}
-	bm.MaxMessageSizeBitLength = MessageSizeToBitLength(maxMessageSize)
+	bm.maxMessageSizeBitLength = MessageSizeToBitLength(maxMessageSize)
 	return bm
 }
 
@@ -78,10 +78,10 @@ func (bm *BuffManager) startListening(address string, socket *net.TCPListener, c
 				}
 			} else {
 				// Hand this off and immediately listen for more
-				go handleListenedConn(address, conn, bm.MaxMessageSizeBitLength, enableLogging, cb)
+				go handleListenedConn(address, conn, maxMessageSizeBitLength, enableLogging, cb)
 			}
 		}
-	}(address, bm.MaxMessageSizeBitLength, bm.EnableLogging, socket)
+	}(address, bm.maxMessageSizeBitLength, bm.enableLogging, socket)
 }
 
 func handleListenedConn(address string, conn net.Conn, maxMessageSize int, enableLogging bool, cb ListenCallback) {
@@ -256,7 +256,7 @@ func (bm *BuffManager) WriteTo(address string, data []byte, persist bool) (int, 
 		}
 	}
 	// Calculate how big the message is, using a consistent header size.
-	msgLenHeader := UInt16ToByteArray(uint16(len(data)), bm.MaxMessageSizeBitLength)
+	msgLenHeader := UInt16ToByteArray(uint16(len(data)), bm.maxMessageSizeBitLength)
 	// Append the size to the message, so now it has a header
 	toWrite := append(msgLenHeader, data...)
 
@@ -294,7 +294,7 @@ func (bm *BuffManager) WriteTo(address string, data []byte, persist bool) (int, 
 	}
 
 	if writeError != nil || persist == false {
-		if writeError != nil && bm.EnableLogging == true {
+		if writeError != nil && bm.enableLogging == true {
 			log.Printf("Error while writing data to %s. Expected to write %d, actually wrote %d", address, len(toWrite), totalBytesWritten)
 			log.Print(writeError)
 		}
@@ -304,7 +304,7 @@ func (bm *BuffManager) WriteTo(address string, data []byte, persist bool) (int, 
 			// What if some bytes written, then failure, then also the close throws an error
 			// []error is a better return type, but not sure if thats a thing you're supposed to do...
 			// Possibilities for error not as complicated as i'm thinking?
-			if bm.EnableLogging == true {
+			if bm.enableLogging == true {
 				// The error will get returned up the stack, no need to log it here?
 				log.Print("There was a subsequent error cleaning up the connection to %s")
 			}
