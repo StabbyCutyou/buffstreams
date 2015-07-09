@@ -31,8 +31,7 @@ func main() {
 			for {
 				_, err := bm.WriteTo(address, msg, true)
 				if err != nil {
-					log.Print("EEEEEERRRRROOOOOOOORRRRRRRRRRR")
-					log.Print(err)
+					log.Printf("Error %s", err)
 				}
 				count = count + 1
 				log.Printf("%d - %d", n, count)
