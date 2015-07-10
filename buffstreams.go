@@ -209,7 +209,6 @@ func readFromConnection(reader *net.TCPConn, buffer []byte) (int, error) {
 		if err != nil && err == io.EOF {
 			// "End of individual transmission"
 			// We're just done reading from that conn
-			log.Print("Error not nil and EOF")
 			return bytesLen, err
 		}
 	}
@@ -218,7 +217,6 @@ func readFromConnection(reader *net.TCPConn, buffer []byte) (int, error) {
 		//"Underlying network failure?"
 		// Not sure what this error would be, but it could exist and i've seen it handled
 		// as a general case in other networking code. Following in the footsteps of (greatness|madness)
-		log.Printf("Error not nil: %s", err)
 		return bytesLen, err
 	}
 	// Read some bytes, return the length
