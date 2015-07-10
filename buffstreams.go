@@ -138,14 +138,11 @@ func handleListenedConn(address string, conn *net.TCPConn, headerByteSize int, m
 				} else {
 					// Client closed the conn
 					log.Printf("Address %s: Client closed connection during header read. Underlying error: %s", address, headerReadError)
-					log.Printf("Error when trying to read from address %s. Tried to read %d, actually read %d. Underlying error: %s", address, headerByteSize, totalHeaderBytesRead, headerReadError)
-
 				}
 			}
 			conn.Close()
 			return
 		}
-		log.Print("NO ERROR!")
 		// Now turn that buffer of bytes into an integer - represnts size of message body
 		msgLength, bytesParsed := binary.Uvarint(headerBuffer)
 		iMsgLength := int(msgLength)
@@ -330,7 +327,7 @@ func (bm *BuffManager) WriteTo(address string, data []byte, persist bool) (int, 
 		totalBytesWritten += bytesWritten
 	}
 
-	if writeError != nil || persist {
+	if writeError != nil || !persist {
 		if writeError != nil && bm.enableLogging {
 			log.Printf("Error while writing data to %s. Expected to write %d, actually wrote %d. Underlying error: %s", address, len(toWrite), totalBytesWritten, writeError)
 		}
