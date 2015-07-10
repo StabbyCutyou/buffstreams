@@ -93,10 +93,10 @@ func (bm *BuffManager) startListening(address string, socket *net.TCPListener, c
 	bm.listeningSockets[address] = socket
 	bm.Unlock()
 
-	go func(address string, headerByteSize int, maxMessageSize int, enableLogging bool, listener net.Listener) {
+	go func(address string, headerByteSize int, maxMessageSize int, enableLogging bool, listener *net.TCPListener) {
 		for {
 			// Wait for someone to connect
-			conn, err := listener.Accept()
+			conn, err := listener.AcceptTCP()
 			if err != nil {
 				if enableLogging {
 					log.Printf("Error attempting to accept connection: %s", err)
@@ -109,7 +109,7 @@ func (bm *BuffManager) startListening(address string, socket *net.TCPListener, c
 	}(address, bm.headerByteSize, bm.maxMessageSize, bm.enableLogging, socket)
 }
 
-func handleListenedConn(address string, conn net.Conn, headerByteSize int, maxMessageSize int, enableLogging bool, cb ListenCallback) {
+func handleListenedConn(address string, conn *net.TCPConn, headerByteSize int, maxMessageSize int, enableLogging bool, cb ListenCallback) {
 	// If there is any error, close the connection officially and break out of the listen-loop.
 	// We don't store these connections anywhere else, and if we can't recover from an error on the socket
 	// we want to kill the connection, exit the goroutine, and let the client handle re-connecting if need be.
@@ -134,16 +134,15 @@ func handleListenedConn(address string, conn net.Conn, headerByteSize int, maxMe
 			if enableLogging {
 				if headerReadError != io.EOF {
 					// Log the error we got from the call to read
-					log.Print("Error when trying to read from address %s. Tried to read %d, actually read %d. Underlying error: %s", address, headerByteSize, totalHeaderBytesRead, headerReadError)
+					log.Printf("Error when trying to read from address %s. Tried to read %d, actually read %d. Underlying error: %s", address, headerByteSize, totalHeaderBytesRead, headerReadError)
 				} else {
 					// Client closed the conn
-					log.Printf("Address %s: Client closed connection. Underlying error: %s", address, headerReadError)
+					log.Printf("Address %s: Client closed connection during header read. Underlying error: %s", address, headerReadError)
 				}
 			}
 			conn.Close()
 			return
 		}
-
 		// Now turn that buffer of bytes into an integer - represnts size of message body
 		msgLength, bytesParsed := binary.Uvarint(headerBuffer)
 		iMsgLength := int(msgLength)
@@ -180,7 +179,7 @@ func handleListenedConn(address string, conn net.Conn, headerByteSize int, maxMe
 					log.Printf("Address %s: Failure to read from connection. Was told to read %d by the header, actually read %d. Underlying error: %s", address, msgLength, totalDataBytesRead, dataReadError)
 				} else {
 					// The client wrote the header but closed the connection
-					log.Printf("Address %s: Client closed connection. Underlying error: %s", address, dataReadError)
+					log.Printf("Address %s: Client closed connection during data read. Underlying error: %s", address, dataReadError)
 				}
 			}
 			conn.Close()
@@ -202,7 +201,7 @@ func handleListenedConn(address string, conn net.Conn, headerByteSize int, maxMe
 	}
 }
 
-func readFromConnection(reader net.Conn, buffer []byte) (int, error) {
+func readFromConnection(reader *net.TCPConn, buffer []byte) (int, error) {
 	// This fills the buffer
 	bytesLen, err := reader.Read(buffer)
 	// Output the content of the bytes to the queue
@@ -326,7 +325,7 @@ func (bm *BuffManager) WriteTo(address string, data []byte, persist bool) (int, 
 		totalBytesWritten += bytesWritten
 	}
 
-	if writeError != nil || persist {
+	if writeError != nil || !persist {
 		if writeError != nil && bm.enableLogging {
 			log.Printf("Error while writing data to %s. Expected to write %d, actually wrote %d. Underlying error: %s", address, len(toWrite), totalBytesWritten, writeError)
 		}
