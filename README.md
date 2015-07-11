@@ -131,10 +131,9 @@ The callback is currently run in it's own goroutine, which also handles reading 
 Roadmap
 =======
 * Release proper set of benchmarks, including more real-world cases
-* Further improvements to the readme
 * Further library optimizations via tools such as pprof
-* Reference implementation
 * Various TODO improvements littering the code to be taken care of
+* Provide direct socket abstraction for people who don't want the manager, but do want the streaming boilerplate for protobuffs
 * Have a proper Roadmap
 
 LISCENSE
