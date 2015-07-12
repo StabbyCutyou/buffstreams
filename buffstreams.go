@@ -3,8 +3,6 @@
 // for consuming streaming protocol buffer messages over TCP
 package buffstreams
 
-import ()
-
 import (
 	"encoding/binary"
 	"errors"
