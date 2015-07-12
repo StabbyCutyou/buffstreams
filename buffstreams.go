@@ -335,7 +335,7 @@ func (bm *BuffManager) WriteTo(address string, data []byte, persist bool) (int, 
 			// Possibilities for error not as complicated as i'm thinking?
 			if bm.enableLogging {
 				// The error will get returned up the stack, no need to log it here?
-				log.Print("There was a subsequent error cleaning up the connection to %s")
+				log.Printf("There was a subsequent error cleaning up the connection to %s", address)
 			}
 			return totalBytesWritten, writeError
 		}
