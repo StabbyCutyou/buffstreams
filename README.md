@@ -13,7 +13,7 @@ BuffStreams gives you a simple interface to start a nonblocking listener on a gi
 Why BuffStreams
 ====================
 
-I was writing a few different projects for fun in Golang, and kept writing code something like what is in the library, but less organized. I decided to focus on the networking code, pulling it out and improving it so I knew it could be trusted to perform reliably across projects. 
+I was writing a few different projects for fun in Golang, and kept writing code something like what is in the library, but less organized. I decided to focus on the networking code, pulling it out and improving it so I knew it could be trusted to perform reliably across projects.
 
 How does it work?
 =================
@@ -22,7 +22,7 @@ Since protobuff messages lack any kind of natural delimeter, BuffStreams uses th
 
 On the server side, it will listen for these payloads, read the fixed header, and then the subsequent message. The server must have the same maximum size as the client for this to work. BuffStreams will then pass the byte array to a callback you provided for handling messages received on that port. Deserializing the messages and interpreting their value is up to you.
 
-One important note is that internally, BuffStreams does not actually use or rely on the Protocol Buffers library itself in any way. All serialization / deserialization is handled by the client prior to / after interactions with BuffStreams. In this way, you could theoretically use this library to stream any data over TCP that uses the same strategy of a fixed header of bytes + a subsequent message body. 
+One important note is that internally, BuffStreams does not actually use or rely on the Protocol Buffers library itself in any way. All serialization / deserialization is handled by the client prior to / after interactions with BuffStreams. In this way, you could theoretically use this library to stream any data over TCP that uses the same strategy of a fixed header of bytes + a subsequent message body.
 
 Currently, I have only used it for ProtocolBuffers messages.
 
@@ -41,7 +41,7 @@ Benchmarks
 
 I've tried very hard to optimize BuffStreams as best as possible, striving to keep it's averages above 1M messages per second, with no errors during transit.
 
-See [Bench](https://github.com/StabbyCutyou/buffstreams/blob/master/BENCH.md)
+See [Bench - OUTDATED](https://github.com/StabbyCutyou/buffstreams/blob/master/BENCH.md)
 
 How do I use it?
 ===================
@@ -98,7 +98,7 @@ If there is an error in writing, that connection will be closed and be reopened 
 
 Using BuffManager to Receive Streaming Messages
 
-Additionally, a BuffManager can listen on local ports for incoming requests. 
+Additionally, a BuffManager can listen on local ports for incoming requests.
 
 ```go
 buffM.StartListening("5031", ListenCallbackExample)

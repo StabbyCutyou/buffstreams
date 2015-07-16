@@ -1,15 +1,17 @@
 package main
 
 import (
-	"github.com/StabbyCutyou/buffstreams"
-	"github.com/StabbyCutyou/buffstreams/test/message"
-	"github.com/golang/protobuf/proto"
 	"log"
 	"net"
 	"strconv"
 	"time"
+
+	"github.com/StabbyCutyou/buffstreams"
+	"github.com/StabbyCutyou/buffstreams/test/message"
+	"github.com/golang/protobuf/proto"
 )
 
+// TestCallback tests the callbacks
 func TestCallback(bts []byte) error {
 	return nil
 }
