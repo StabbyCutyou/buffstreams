@@ -110,6 +110,10 @@ func (btl *BuffTCPListener) StartListening() error {
 	return btl.blockListen()
 }
 
+func (btl *BuffTCPListener) Close() {
+	btl.shutdownChannel <- true
+}
+
 // StartListeningAsync represents a way to start accepting TCP connections, which are
 // handled by the Callback provided upon initialization. It does the listening
 // in a go-routine, so as not to block.

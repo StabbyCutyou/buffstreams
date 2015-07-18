@@ -1,6 +1,8 @@
 package buffstreams
 
 import (
+	"log"
+	"os"
 	"strconv"
 	"testing"
 	"time"
@@ -29,18 +31,29 @@ var (
 		Callback:       exampleCallback,
 	}
 
-	btl = func() *BuffTCPListener {
-		buffL, _ := ListenBuffTCP(listenConfig)
-		buffL.StartListeningAsync()
-		return buffL
-	}()
-	btw      = func() *BuffTCPWriter { buffW, _ := DialBuffTCP(writeConfig); return buffW }()
+	btl      = &BuffTCPListener{}
+	btw      = &BuffTCPWriter{}
 	name     = "Stabby"
 	date     = time.Now().UnixNano()
 	data     = "This is an intenntionally long and rambling sentence to pad out the size of the message."
 	msg      = &message.Note{Name: &name, Date: &date, Comment: &data}
 	msgBytes = func(*message.Note) []byte { b, _ := proto.Marshal(msg); return b }(msg)
 )
+
+func TestMain(m *testing.M) {
+	btl, err := ListenBuffTCP(listenConfig)
+	if err != nil {
+		log.Fatal(err)
+	}
+	btl.StartListeningAsync()
+	btw, err = DialBuffTCP(writeConfig)
+	if err != nil {
+		log.Fatal(err)
+	}
+	os.Exit(m.Run())
+	btw.Close()
+	btl.Close()
+}
 
 func TestDialBuffTCPUsesDefaultMessageSize(t *testing.T) {
 	cfg := BuffTCPWriterConfig{
