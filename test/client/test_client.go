@@ -28,8 +28,8 @@ func main() {
 		log.Print(err)
 	}
 	count := 0
-	btw := buffstreams.NewBuffTCPWriter(cfg)
-	if err := btw.Open(); err != nil {
+	btw, err := buffstreams.DialBuffTCP(cfg)
+	if err != nil {
 		log.Fatal(err)
 	}
 	currentTime := time.Now()

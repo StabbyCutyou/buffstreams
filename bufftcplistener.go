@@ -40,8 +40,8 @@ type BuffTCPListenerConfig struct {
 	Callback ListenCallback
 }
 
-// NewBuffTCPListener represents
-func NewBuffTCPListener(cfg BuffTCPListenerConfig) *BuffTCPListener {
+// ListenBuffTCP represents
+func ListenBuffTCP(cfg BuffTCPListenerConfig) (*BuffTCPListener, error) {
 	maxMessageSize := DefaultMaxMessageSize
 	// 0 is the default, and the message must be atleast 1 byte large
 	if cfg.MaxMessageSize != 0 {
@@ -56,7 +56,11 @@ func NewBuffTCPListener(cfg BuffTCPListenerConfig) *BuffTCPListener {
 		address:         cfg.Address,
 	}
 
-	return btl
+	if err := btl.openSocket(); err != nil {
+		return nil, err
+	}
+
+	return btl, nil
 }
 
 func (btl *BuffTCPListener) blockListen() error {
@@ -103,11 +107,7 @@ func (btl *BuffTCPListener) openSocket() error {
 // handled by the Callback provided upon initialization. This method will block
 // the current executing thread / go-routine.
 func (btl *BuffTCPListener) StartListening() error {
-	if err := btl.openSocket(); err != nil {
-		return err
-	}
-	err := btl.blockListen()
-	return err
+	return btl.blockListen()
 }
 
 // StartListeningAsync represents a way to start accepting TCP connections, which are
@@ -115,9 +115,6 @@ func (btl *BuffTCPListener) StartListening() error {
 // in a go-routine, so as not to block.
 func (btl *BuffTCPListener) StartListeningAsync() error {
 	var err error
-	if err = btl.openSocket(); err != nil {
-		return err
-	}
 	go func() {
 		err = btl.blockListen()
 	}()

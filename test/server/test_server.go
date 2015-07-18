@@ -26,7 +26,10 @@ func main() {
 		Callback:       TestCallback,
 	}
 
-	btl := buffstreams.NewBuffTCPListener(cfg)
+	btl, err := buffstreams.ListenBuffTCP(cfg)
+	if err != nil {
+		log.Print(err)
+	}
 	if err := btl.StartListening(); err != nil {
 		log.Print(err)
 	} else {

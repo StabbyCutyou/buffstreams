@@ -27,7 +27,7 @@ type BuffTCPWriterConfig struct {
 }
 
 // Open represents
-func (btw *BuffTCPWriter) Open() error {
+func (btw *BuffTCPWriter) open() error {
 	tcpAddr, err := net.ResolveTCPAddr("tcp", btw.address)
 	if err != nil {
 		return err
@@ -45,8 +45,8 @@ func (btw *BuffTCPWriter) Close() error {
 	return btw.socket.Close()
 }
 
-// NewBuffTCPWriter represents
-func NewBuffTCPWriter(cfg BuffTCPWriterConfig) *BuffTCPWriter {
+// DialBuffTCP represents
+func DialBuffTCP(cfg BuffTCPWriterConfig) (*BuffTCPWriter, error) {
 	maxMessageSize := DefaultMaxMessageSize
 	// 0 is the default, and the message must be atleast 1 byte large
 	if cfg.MaxMessageSize != 0 {
@@ -59,7 +59,10 @@ func NewBuffTCPWriter(cfg BuffTCPWriterConfig) *BuffTCPWriter {
 		headerByteSize: messageSizeToBitLength(maxMessageSize),
 		address:        cfg.Address,
 	}
-	return btw
+	if err := btw.open(); err != nil {
+		return nil, err
+	}
+	return btw, nil
 }
 
 // Write allows you to send a stream of bytes as messages. Each array of bytes
