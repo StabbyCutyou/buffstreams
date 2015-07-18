@@ -136,6 +136,6 @@ Roadmap
 * Provide direct socket abstraction for people who don't want the manager, but do want the streaming boilerplate for protobuffs
 * Have a proper Roadmap
 
-LISCENSE
+LICENSE
 =========
 Apache v2 - See LICENSE
