@@ -110,6 +110,8 @@ func (btl *BuffTCPListener) StartListening() error {
 	return btl.blockListen()
 }
 
+// Close represents a way to signal to the Listener that it should no longer accept
+// incoming connections, and begin to shutdown.
 func (btl *BuffTCPListener) Close() {
 	btl.shutdownChannel <- true
 }
