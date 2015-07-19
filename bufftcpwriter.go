@@ -40,6 +40,20 @@ func (btw *BuffTCPWriter) open() error {
 	return err
 }
 
+// Reopen allows you to close and re-establish a connection to the existing Address
+// without needing to create a whole new BuffTCPWriter object
+func (btw *BuffTCPWriter) Reopen() error {
+	if err := btw.Close(); err != nil {
+		return err
+	}
+
+	if err := btw.open(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // Close represents
 func (btw *BuffTCPWriter) Close() error {
 	return btw.socket.Close()
