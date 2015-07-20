@@ -113,13 +113,13 @@ func (bm *BuffManager) CloseWriter(address string) error {
 	return ErrNotOpened
 }
 
-// WriteTo allows you to dial to a remote or local TCP endpoint, and send a series of
+// Write allows you to dial to a remote or local TCP endpoint, and send a series of
 // bytes as messages. Each array of bytes you pass in will be pre-pended with it's size
 // within the size of the pre-defined maximum message size. If the connection isn't open yet,
 // WriteTo will open it, and cache it. If for anyreason the connection breaks, it will be disposed
 // a. If not all bytes can be written,
 // WriteTo will keep trying until the full message is delivered, or the connection is broken.
-func (bm *BuffManager) WriteTo(address string, data []byte) (int, error) {
+func (bm *BuffManager) Write(address string, data []byte) (int, error) {
 	// Get the connection if it's cached, or open a new one
 	bm.dialerLock.RLock()
 	btw, ok := bm.dialedConnections[address]

@@ -146,6 +146,39 @@ This will open a connection to the endpoint at the specified location. From ther
 
 If there is an error in writing, that connection will be closed and be reopened on the next write. There is no guarantee if any the bytesWritten value will be >0 or not in the event of an error which results in a reconnect.
 
+BuffManager
+===========
+
+There is a third option, the provided BuffManager class. This class will give you a simple but effective Manager abstraction over dialing and listening over ports, managing the connections for you. You provide the normal configuration for dialing out or listening for incoming connections, and let the manager hold onto the references.
+
+Creating a BuffManager
+
+```go
+bm := buffstreams.NewBuffManager()
+```
+
+Listening on a port. BuffManager always makes this asyncrhonous and non blocking
+
+```go
+// Assuming you've got a configuration object cfg, see above
+err := bm.StartListening(cfg)
+```
+
+Dialing out to a remote endpoint
+
+```go
+// Assuming you've got a configuration object cfg, see above
+err := bm.Dial(cfg)
+```
+
+Having opened a connection, writing to that connection in a constant fashion
+
+```go
+bytesWritten, err := bm.Write("127.0.0.1:5031", dataBytes)
+```
+
+The BuffManager will use locks to internally maintain threadsafety
+
 Roadmap
 =======
 * Release proper set of benchmarks, including more real-world cases
