@@ -1,21 +1,23 @@
 package main
 
 import (
-	"github.com/StabbyCutyou/buffstreams"
-	"github.com/StabbyCutyou/buffstreams/test/message"
-	"github.com/golang/protobuf/proto"
 	"log"
 	"strconv"
 	"time"
+
+	"github.com/StabbyCutyou/buffstreams"
+	"github.com/StabbyCutyou/buffstreams/test/message"
+	"github.com/golang/protobuf/proto"
 )
 
 // Test client to send a sample payload of data endlessly
 // By default it points locally, but it can point to any network address
 // TODO Make that externally configurable to make automating the test easier
 func main() {
-	cfg := buffstreams.BuffManagerConfig{
+	cfg := buffstreams.BuffTCPWriterConfig{
 		MaxMessageSize: 2048,
 		EnableLogging:  true,
+		Address:        buffstreams.FormatAddress("127.0.0.1", strconv.Itoa(5031)),
 	}
 	name := "Stabby"
 	date := time.Now().UnixNano()
@@ -26,12 +28,14 @@ func main() {
 		log.Print(err)
 	}
 	count := 0
-	bm := buffstreams.New(cfg)
+	btw, err := buffstreams.DialBuffTCP(cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
 	currentTime := time.Now()
 	lastTime := currentTime
-	address := buffstreams.FormatAddress("127.0.0.1", strconv.Itoa(5031))
 	for {
-		_, err := bm.WriteTo(address, msgBytes, true)
+		_, err := btw.Write(msgBytes)
 		if err != nil {
 			log.Print("EEEEEERRRRROOOOOOOORRRRRRRRRRR")
 			log.Print(err)

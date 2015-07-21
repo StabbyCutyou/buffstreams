@@ -1,0 +1,7 @@
+language: go
+
+go:
+  - 1.4.2
+
+install:
+  - go get github.com/golang/protobuf/proto
