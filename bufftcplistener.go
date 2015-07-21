@@ -27,20 +27,26 @@ type BuffTCPListener struct {
 	shutdownChannel          chan (bool)
 }
 
-// BuffTCPListenerConfig representss
+// BuffTCPListenerConfig representss the information needed to begin listening for
+// incoming messages.
 type BuffTCPListenerConfig struct {
 	// Controls how large the largest Message may be. The server will reject any messages whose clients
 	// header size does not match this configuration
 	MaxMessageSize int
 	// Controls the ability to enable logging errors occuring in the library
 	EnableLogging bool
-	// The local address to listen for incoming connections on
+	// The local address to listen for incoming connections on. Typically, you exclude
+	// the ip, and just provide port, ie: ":5031"
 	Address string
-	// The callback to invoke once a full set of message bytes has been received
+	// The callback to invoke once a full set of message bytes has been received. It
+	// is your responsibility to handle parsing the incoming message and handling errors
+	// inside the callback
 	Callback ListenCallback
 }
 
-// ListenBuffTCP represents
+// ListenBuffTCP creates a BuffTCPListener, and opens it's local connection to
+// allow it to begin receiving, once you're ready to. So the connection is open,
+// but it is not yet attempting to handle connections.
 func ListenBuffTCP(cfg BuffTCPListenerConfig) (*BuffTCPListener, error) {
 	maxMessageSize := DefaultMaxMessageSize
 	// 0 is the default, and the message must be atleast 1 byte large
@@ -63,6 +69,8 @@ func ListenBuffTCP(cfg BuffTCPListenerConfig) (*BuffTCPListener, error) {
 	return btl, nil
 }
 
+// Actually blocks the thread it's running on, and begins handling incoming
+// requests
 func (btl *BuffTCPListener) blockListen() error {
 	for {
 		// Wait for someone to connect
@@ -127,6 +135,8 @@ func (btl *BuffTCPListener) StartListeningAsync() error {
 	return err
 }
 
+// Handles each incoming connection, run within it's own goroutine. This method will
+// loop until the client disconnects or another error occurs and is not handled
 func handleListenedConn(address string, conn *net.TCPConn, headerByteSize int, maxMessageSize int, enableLogging bool, cb ListenCallback) {
 	// If there is any error, close the connection officially and break out of the listen-loop.
 	// We don't store these connections anywhere else, and if we can't recover from an error on the socket
@@ -219,6 +229,7 @@ func handleListenedConn(address string, conn *net.TCPConn, headerByteSize int, m
 	}
 }
 
+// Handles reading from a given connection.
 func readFromConnection(reader *net.TCPConn, buffer []byte) (int, error) {
 	// This fills the buffer
 	bytesLen, err := reader.Read(buffer)

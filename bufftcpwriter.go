@@ -15,7 +15,8 @@ type BuffTCPWriter struct {
 	enableLogging  bool
 }
 
-// BuffTCPWriterConfig represents
+// BuffTCPWriterConfig representss the information needed to begin listening for
+// writing messages.
 type BuffTCPWriterConfig struct {
 	// Controls how large the largest Message may be. The server will reject any messages whose clients
 	// header size does not match this configuration
@@ -26,7 +27,7 @@ type BuffTCPWriterConfig struct {
 	Address string
 }
 
-// Open represents
+// open will dial a connection to the remote endpoint
 func (btw *BuffTCPWriter) open() error {
 	tcpAddr, err := net.ResolveTCPAddr("tcp", btw.address)
 	if err != nil {
@@ -54,12 +55,15 @@ func (btw *BuffTCPWriter) Reopen() error {
 	return nil
 }
 
-// Close represents
+// Close will immediately call close on the connection to the remote endpoint. You
+// should not call this if other threads may be using the underlying socktet, unless
+// you control it in a mutex of some kind.
 func (btw *BuffTCPWriter) Close() error {
 	return btw.socket.Close()
 }
 
-// DialBuffTCP represents
+// DialBuffTCP creates a BuffTCPWriter, and dials a connection to the remote
+// endpoint. It does not begin writing anything until you begin to do so
 func DialBuffTCP(cfg BuffTCPWriterConfig) (*BuffTCPWriter, error) {
 	maxMessageSize := DefaultMaxMessageSize
 	// 0 is the default, and the message must be atleast 1 byte large
