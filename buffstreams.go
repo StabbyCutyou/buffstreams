@@ -3,6 +3,9 @@
 // for consuming streaming protocol buffer messages over TCP
 package buffstreams
 
+// Version is the official semver for the library
+const Version string = "1.0.0"
+
 // DefaultMaxMessageSize is the value that is used if a ManagerConfig indicates
 // a MaxMessageSize of 0
 const DefaultMaxMessageSize int = 4096
