@@ -3,7 +3,7 @@
 // for consuming streaming protocol buffer messages over TCP
 package buffstreams
 
-// DefaultMaxMessageSize is the value that is used if a BuffManagerConfig indicates
+// DefaultMaxMessageSize is the value that is used if a ManagerConfig indicates
 // a MaxMessageSize of 0
 const DefaultMaxMessageSize int = 4096
 
