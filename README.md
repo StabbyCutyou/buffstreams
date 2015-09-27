@@ -77,7 +77,7 @@ cfg := TCPListenerConfig {
 ```
 
 ```go
-btl, err := buffstreams.ListenBuffTCP(cfg)
+btl, err := buffstreams.ListenTCP(cfg)
 ```
 Once you've opened a listener this way, the socket is now in use, but the listener itself has not yet begun to accept connections.
 
@@ -135,7 +135,7 @@ cfg := TCPWriterConfig {
 Once you have a configuration object, you can Dial out.
 
 ```go
-btw, err := buffstreams.Dial(cfg)
+btw, err := buffstreams.DialTCP(cfg)
 ```
 
 This will open a connection to the endpoint at the specified location. From there, you can write your data

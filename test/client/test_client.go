@@ -28,7 +28,7 @@ func main() {
 		log.Print(err)
 	}
 	count := 0
-	btw, err := buffstreams.DialBuffTCP(cfg)
+	btw, err := buffstreams.DialTCP(cfg)
 	if err != nil {
 		log.Fatal(err)
 	}

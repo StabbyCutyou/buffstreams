@@ -41,12 +41,12 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	btl, err := ListenBuffTCP(listenConfig)
+	btl, err := ListenTCP(listenConfig)
 	if err != nil {
 		log.Fatal(err)
 	}
 	btl.StartListeningAsync()
-	btw, err = DialBuffTCP(writeConfig)
+	btw, err = DialTCP(writeConfig)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -59,7 +59,7 @@ func TestDialBuffTCPUsesDefaultMessageSize(t *testing.T) {
 	cfg := TCPWriterConfig{
 		Address: writeConfig.Address,
 	}
-	buffM, err := DialBuffTCP(cfg)
+	buffM, err := DialTCP(cfg)
 	if err != nil {
 		t.Errorf("Failed to open connection to %d: %s", cfg.Address, err)
 	}
@@ -73,7 +73,7 @@ func TestDialBuffTCPUsesSpecifiedMaxMessageSize(t *testing.T) {
 		Address:        writeConfig.Address,
 		MaxMessageSize: 8196,
 	}
-	buffM, err := DialBuffTCP(cfg)
+	buffM, err := DialTCP(cfg)
 	if err != nil {
 		t.Errorf("Failed to open connection to %d: %s", cfg.Address, err)
 	}

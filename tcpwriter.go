@@ -62,9 +62,9 @@ func (btw *TCPWriter) Close() error {
 	return btw.socket.Close()
 }
 
-// DialBuffTCP creates a TCPWriter, and dials a connection to the remote
+// DialTCP creates a TCPWriter, and dials a connection to the remote
 // endpoint. It does not begin writing anything until you begin to do so
-func DialBuffTCP(cfg TCPWriterConfig) (*TCPWriter, error) {
+func DialTCP(cfg TCPWriterConfig) (*TCPWriter, error) {
 	maxMessageSize := DefaultMaxMessageSize
 	// 0 is the default, and the message must be atleast 1 byte large
 	if cfg.MaxMessageSize != 0 {

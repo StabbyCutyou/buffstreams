@@ -56,7 +56,7 @@ func (bm *Manager) StartListening(cfg TCPListenerConfig) error {
 		return ErrAlreadyOpened
 	}
 
-	btl, err := ListenBuffTCP(cfg)
+	btl, err := ListenTCP(cfg)
 	if err != nil {
 		return err
 	}
@@ -93,7 +93,7 @@ func (bm *Manager) Dial(cfg TCPWriterConfig) error {
 		return ErrAlreadyOpened
 	}
 
-	btw, err := DialBuffTCP(cfg)
+	btw, err := DialTCP(cfg)
 	if err != nil {
 		return err
 	}

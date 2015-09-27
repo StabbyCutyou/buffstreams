@@ -43,10 +43,10 @@ type TCPListenerConfig struct {
 	Callback ListenCallback
 }
 
-// ListenBuffTCP creates a TCPListener, and opens it's local connection to
+// ListenTCP creates a TCPListener, and opens it's local connection to
 // allow it to begin receiving, once you're ready to. So the connection is open,
 // but it is not yet attempting to handle connections.
-func ListenBuffTCP(cfg TCPListenerConfig) (*TCPListener, error) {
+func ListenTCP(cfg TCPListenerConfig) (*TCPListener, error) {
 	maxMessageSize := DefaultMaxMessageSize
 	// 0 is the default, and the message must be atleast 1 byte large
 	if cfg.MaxMessageSize != 0 {
