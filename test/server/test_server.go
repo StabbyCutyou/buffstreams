@@ -12,21 +12,31 @@ import (
 
 // TestCallback is a simple server for test purposes. It has a single callback,
 // which is to unmarshall some data and log it.
-func TestCallback(bts []byte) error {
+func (t *testController) TestCallback(bts []byte) error {
 	msg := &message.Note{}
 	err := proto.Unmarshal(bts, msg)
+	if t.enableLogging {
+		log.Print(msg.GetComment())
+	}
 	return err
 }
 
+type testController struct {
+	enableLogging bool
+}
+
 func main() {
-	cfg := buffstreams.BuffTCPListenerConfig{
+	tc := &testController{
+		enableLogging: true,
+	}
+	cfg := buffstreams.TCPListenerConfig{
 		MaxMessageSize: 2048,
-		EnableLogging:  true,
+		EnableLogging:  tc.enableLogging,
 		Address:        buffstreams.FormatAddress("", strconv.Itoa(5031)),
-		Callback:       TestCallback,
+		Callback:       tc.TestCallback,
 	}
 
-	btl, err := buffstreams.ListenBuffTCP(cfg)
+	btl, err := buffstreams.ListenTCP(cfg)
 	if err != nil {
 		log.Print(err)
 	}

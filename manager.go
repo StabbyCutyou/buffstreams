@@ -13,23 +13,23 @@ var ErrAlreadyOpened = errors.New("A connection to this ip / port is already ope
 // an address that they have not opened yet.
 var ErrNotOpened = errors.New("A connection to this ip / port must be opened first.")
 
-// BuffManager represents the object used to govern interactions between tcp endpoints.
+// Manager represents the object used to govern interactions between tcp endpoints.
 // You can use it to read from and write to streaming or non-streaming TCP connections
 // and have it handle packaging data with a header describing the size of the data payload.
 // This is to make it easy to work with wire formats like ProtocolBuffers, which require
 // a custom-delimeter situation to be sent in a streaming fashion.
-type BuffManager struct {
-	dialedConnections map[string]*BuffTCPWriter
-	listeningSockets  map[string]*BuffTCPListener
+type Manager struct {
+	dialedConnections map[string]*TCPWriter
+	listeningSockets  map[string]*TCPListener
 	dialerLock        *sync.RWMutex
 	listenerLock      *sync.Mutex
 }
 
-// NewBuffManager creates a new *BuffManager based on the provided BuffManagerConfig
-func NewBuffManager() *BuffManager {
-	bm := &BuffManager{
-		dialedConnections: make(map[string]*BuffTCPWriter),
-		listeningSockets:  make(map[string]*BuffTCPListener),
+// NewManager creates a new *Manager based on the provided ManagerConfig
+func NewManager() *Manager {
+	bm := &Manager{
+		dialedConnections: make(map[string]*TCPWriter),
+		listeningSockets:  make(map[string]*TCPListener),
 		dialerLock:        &sync.RWMutex{},
 		listenerLock:      &sync.Mutex{},
 	}
@@ -41,9 +41,9 @@ func NewBuffManager() *BuffManager {
 // read the fixed header, then the message payload, and then invoke the povided ListenCallbacl.
 // In the event of an transport error, it will disconnect the client. It is the clients responsibility
 // to re-connect if needed.
-func (bm *BuffManager) StartListening(cfg BuffTCPListenerConfig) error {
-	// Example BuffTCPListenerConfig
-	// cfg := BuffTCPListenerConfig{
+func (bm *Manager) StartListening(cfg TCPListenerConfig) error {
+	// Example TCPListenerConfig
+	// cfg := TCPListenerConfig{
 	//   Address: FormatAddress("", port),
 	//   Callback: func([]bytes) error {return nil},
 	//   MaxMessageSize: 4096,
@@ -56,18 +56,18 @@ func (bm *BuffManager) StartListening(cfg BuffTCPListenerConfig) error {
 		return ErrAlreadyOpened
 	}
 
-	btl, err := ListenBuffTCP(cfg)
+	btl, err := ListenTCP(cfg)
 	if err != nil {
 		return err
 	}
 	bm.listeningSockets[cfg.Address] = btl
-	// By design, BuffTCPManager encourages laziness
+	// By design, TCPManager encourages laziness
 	return btl.StartListeningAsync()
 }
 
-// CloseListener lets you send a signal to a BuffTCPListener that tells it to
+// CloseListener lets you send a signal to a TCPListener that tells it to
 // stop accepting new requests. It will finish any requests in flight.
-func (bm *BuffManager) CloseListener(address string) error {
+func (bm *Manager) CloseListener(address string) error {
 	bm.listenerLock.Lock()
 	defer bm.listenerLock.Unlock()
 	if btl, ok := bm.listeningSockets[address]; ok == true {
@@ -78,22 +78,22 @@ func (bm *BuffManager) CloseListener(address string) error {
 	return ErrNotOpened
 }
 
-// Dial must be called before attempting to write. This is because the BuffTCPWriter
+// Dial must be called before attempting to write. This is because the TCPWriter
 // need certain configuration information, which should be provided upfront. Once
 // the connection is open, there should be no need to check on it's status. WriteTo
 // will attempt to re-use or rebuild the connection using the existing connection if
 // any errors occur on a write. It will return the number of bytes written. While
-// the BuffTCPWriter makes every attempt to continue to send bytes until they are all
+// the TCPWriter makes every attempt to continue to send bytes until they are all
 // written, you should always check to make sure this number matches the bytes you
 // attempted to write, due to very exceptional cases.
-func (bm *BuffManager) Dial(cfg BuffTCPWriterConfig) error {
+func (bm *Manager) Dial(cfg TCPWriterConfig) error {
 	bm.dialerLock.Lock()
 	defer bm.dialerLock.Unlock()
 	if _, ok := bm.dialedConnections[cfg.Address]; ok {
 		return ErrAlreadyOpened
 	}
 
-	btw, err := DialBuffTCP(cfg)
+	btw, err := DialTCP(cfg)
 	if err != nil {
 		return err
 	}
@@ -101,9 +101,9 @@ func (bm *BuffManager) Dial(cfg BuffTCPWriterConfig) error {
 	return nil
 }
 
-// CloseWriter lets you send a signal to a BuffTCPWriter that tells it to
+// CloseWriter lets you send a signal to a TCPWriter that tells it to
 // stop accepting new requests. It will finish any requests in flight.
-func (bm *BuffManager) CloseWriter(address string) error {
+func (bm *Manager) CloseWriter(address string) error {
 	bm.dialerLock.Lock()
 	defer bm.dialerLock.Unlock()
 	if btw, ok := bm.dialedConnections[address]; ok == true {
@@ -119,7 +119,7 @@ func (bm *BuffManager) CloseWriter(address string) error {
 // WriteTo will open it, and cache it. If for anyreason the connection breaks, it will be disposed
 // a. If not all bytes can be written,
 // WriteTo will keep trying until the full message is delivered, or the connection is broken.
-func (bm *BuffManager) Write(address string, data []byte) (int, error) {
+func (bm *Manager) Write(address string, data []byte) (int, error) {
 	// Get the connection if it's cached, or open a new one
 	bm.dialerLock.RLock()
 	btw, ok := bm.dialedConnections[address]

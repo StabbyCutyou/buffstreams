@@ -63,12 +63,12 @@ import "github.com/StabbyCutyou/buffstreams"
 Listening for connections
 =========================
 
-One of the core objects in Buffstreams is the BuffTCPListener. This struct allows you to open a socket on a local port, and begin waiting for clients to connect. Once a connection is made, each full message written by the client will be received by the Listener, and a callback you define will be invoked with the message contents (an array of bytes).
+One of the core objects in Buffstreams is the TCPListener. This struct allows you to open a socket on a local port, and begin waiting for clients to connect. Once a connection is made, each full message written by the client will be received by the Listener, and a callback you define will be invoked with the message contents (an array of bytes).
 
-To begin listening, first create a BuffTCPListenerConfig object to define how the listener should behave. A sample BuffTCPListenerConfig might look like this:
+To begin listening, first create a TCPListenerConfig object to define how the listener should behave. A sample TCPListenerConfig might look like this:
 
 ```go
-cfg := BuffTCPListenerConfig {
+cfg := TCPListenerConfig {
   EnableLogging: false, // true will have log messages printed to stdout/stderr, via log
   MaxMessageSize: 4098,
   Callback: func(byte[])error{return nil} // Any function type that adheres to this signature, you'll need to deserialize in here if need be
@@ -77,7 +77,7 @@ cfg := BuffTCPListenerConfig {
 ```
 
 ```go
-btl, err := buffstreams.ListenBuffTCP(cfg)
+btl, err := buffstreams.ListenTCP(cfg)
 ```
 Once you've opened a listener this way, the socket is now in use, but the listener itself has not yet begun to accept connections.
 
@@ -122,10 +122,10 @@ The callback is currently run in it's own goroutine, which also handles reading 
 Writing messages
 ================
 
-To begin writing messages, you'll need to dial a BuffTCPWriter using BuffTCPWriterConfig
+To begin writing messages, you'll need to dial a TCPWriter using TCPWriterConfig
 
 ```go
-cfg := BuffTCPWriterConfig {
+cfg := TCPWriterConfig {
   EnableLogging: false, // true will have log messages printed to stdout/stderr, via log
   MaxMessageSize: 4098, // You want this to match the MaxMessageSize the server expects for messages on that socket
   Address: FormatAddress("127.0.0.1", strconv.Itoa(5031)) // Any address with the pattern ip:port. The FormatAddress helper is here for convenience.
@@ -135,7 +135,7 @@ cfg := BuffTCPWriterConfig {
 Once you have a configuration object, you can Dial out.
 
 ```go
-btw, err := buffstreams.Dial(cfg)
+btw, err := buffstreams.DialTCP(cfg)
 ```
 
 This will open a connection to the endpoint at the specified location. From there, you can write your data
@@ -146,18 +146,20 @@ This will open a connection to the endpoint at the specified location. From ther
 
 If there is an error in writing, that connection will be closed and be reopened on the next write. There is no guarantee if any the bytesWritten value will be >0 or not in the event of an error which results in a reconnect.
 
-BuffManager
+Manager
 ===========
 
-There is a third option, the provided BuffManager class. This class will give you a simple but effective Manager abstraction over dialing and listening over ports, managing the connections for you. You provide the normal configuration for dialing out or listening for incoming connections, and let the manager hold onto the references.
+There is a third option, the provided Manager class. This class will give you a simple but effective Manager abstraction over dialing and listening over ports, managing the connections for you. You provide the normal configuration for dialing out or listening for incoming connections, and let the manager hold onto the references. The Manager is considered threadsafe, as it internally uses locks to ensure consistency and coordination between concurrent access to the connections being held.
 
-Creating a BuffManager
+The Manager is not really a "Pool", in that it doesn't open and hold X connections for you to re-use. However, it maintains many of the same behaviors as a pool, including caching and re-using connections, and as mentioned is threadsafe.
+
+Creating a Manager
 
 ```go
-bm := buffstreams.NewBuffManager()
+bm := buffstreams.NewManager()
 ```
 
-Listening on a port. BuffManager always makes this asyncrhonous and non blocking
+Listening on a port. Manager always makes this asyncrhonous and non blocking
 
 ```go
 // Assuming you've got a configuration object cfg, see above
@@ -177,12 +179,25 @@ Having opened a connection, writing to that connection in a constant fashion
 bytesWritten, err := bm.Write("127.0.0.1:5031", dataBytes)
 ```
 
-The BuffManager will use locks to internally maintain threadsafety
+The Manager will keep listening and dialed out connections cached internally. Once you open one, it'll be kept open. The writer will match your incoming write destination, such that any time you write to that same address, the correct writer will be re-used. The listening connection will simply remain open, waiting to receive requests.
+
+You can forcibly close these connections, by calling either
+
+```go
+err := bm.CloseListener("127.0.0.1:5031")
+```
+
+or
+
+```go
+err := bm.CloseWriter("127.0.0.1:5031")
+```
 
 Roadmap
 =======
 * Release proper set of benchmarks, including more real-world cases
 * Configurable retry for the client, configurable errored-message queue for user to define failover process to handle.
+* Optional channel based streaming approach instead of callbacks
 * Further library optimizations via tools such as pprof
 * gb maybe?
 
