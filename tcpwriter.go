@@ -89,7 +89,7 @@ func DialBuffTCP(cfg TCPWriterConfig) (*TCPWriter, error) {
 // trying until the full message is delivered, or the connection is broken.
 func (btw *TCPWriter) Write(data []byte) (int, error) {
 	// Calculate how big the message is, using a consistent header size.
-	msgLenHeader := uInt16ToByteArray(uint16(len(data)), btw.headerByteSize)
+	msgLenHeader := intToByteArray(int64(len(data)), btw.headerByteSize)
 	// Append the size to the message, so now it has a header
 	toWrite := append(msgLenHeader, data...)
 

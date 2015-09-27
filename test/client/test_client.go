@@ -37,7 +37,7 @@ func main() {
 	for {
 		_, err := btw.Write(msgBytes)
 		if err != nil {
-			log.Print("EEEEEERRRRROOOOOOOORRRRRRRRRRR")
+			log.Print("There was an error")
 			log.Print(err)
 		}
 		count = count + 1

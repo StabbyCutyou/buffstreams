@@ -1,7 +1,6 @@
 package buffstreams
 
 import (
-	"encoding/binary"
 	"io"
 	"log"
 	"net"
@@ -172,7 +171,7 @@ func handleListenedConn(address string, conn *net.TCPConn, headerByteSize int, m
 			return
 		}
 		// Now turn that buffer of bytes into an integer - represnts size of message body
-		msgLength, bytesParsed := binary.Uvarint(headerBuffer)
+		msgLength, bytesParsed := byteArrayToUInt32(headerBuffer)
 		iMsgLength := int(msgLength)
 		// Not sure what the correct way to handle these errors are. For now, bomb out
 		if bytesParsed == 0 {
@@ -190,7 +189,6 @@ func handleListenedConn(address string, conn *net.TCPConn, headerByteSize int, m
 			conn.Close()
 			return
 		}
-
 		var dataReadError error
 		var totalDataBytesRead = 0
 		bytesRead = 0
@@ -213,11 +211,10 @@ func handleListenedConn(address string, conn *net.TCPConn, headerByteSize int, m
 			conn.Close()
 			return
 		}
-
 		// If we read bytes, there wasn't an error, or if there was it was only EOF
 		// And readbytes + EOF is normal, just as readbytes + no err, next read 0 bytes EOF
 		// So... we take action on the actual message data
-		if totalDataBytesRead == 0 && (dataReadError == nil || (dataReadError != nil && dataReadError == io.EOF)) {
+		if totalDataBytesRead > 0 && (dataReadError == nil || (dataReadError != nil && dataReadError == io.EOF)) {
 			err := cb(dataBuffer[:iMsgLength])
 			if err != nil && enableLogging {
 				log.Printf("Error in Callback: %s", err)
