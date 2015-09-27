@@ -19,7 +19,7 @@ func TestCallback(bts []byte) error {
 }
 
 func main() {
-	cfg := buffstreams.BuffTCPListenerConfig{
+	cfg := buffstreams.TCPListenerConfig{
 		MaxMessageSize: 2048,
 		EnableLogging:  true,
 		Address:        buffstreams.FormatAddress("", strconv.Itoa(5031)),

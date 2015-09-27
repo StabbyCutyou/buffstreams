@@ -6,7 +6,7 @@ import (
 )
 
 func TestListenBuffTCPUsesDefaultMessageSize(t *testing.T) {
-	cfg := BuffTCPListenerConfig{
+	cfg := TCPListenerConfig{
 		Address: FormatAddress("", strconv.Itoa(5031)),
 	}
 	buffM, err := ListenBuffTCP(cfg)
@@ -19,7 +19,7 @@ func TestListenBuffTCPUsesDefaultMessageSize(t *testing.T) {
 }
 
 func TestListenBuffTCPUsesSpecifiedMaxMessageSize(t *testing.T) {
-	cfg := BuffTCPListenerConfig{
+	cfg := TCPListenerConfig{
 		MaxMessageSize: 8196,
 		Address:        FormatAddress("", strconv.Itoa(5032)),
 	}

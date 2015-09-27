@@ -63,12 +63,12 @@ import "github.com/StabbyCutyou/buffstreams"
 Listening for connections
 =========================
 
-One of the core objects in Buffstreams is the BuffTCPListener. This struct allows you to open a socket on a local port, and begin waiting for clients to connect. Once a connection is made, each full message written by the client will be received by the Listener, and a callback you define will be invoked with the message contents (an array of bytes).
+One of the core objects in Buffstreams is the TCPListener. This struct allows you to open a socket on a local port, and begin waiting for clients to connect. Once a connection is made, each full message written by the client will be received by the Listener, and a callback you define will be invoked with the message contents (an array of bytes).
 
-To begin listening, first create a BuffTCPListenerConfig object to define how the listener should behave. A sample BuffTCPListenerConfig might look like this:
+To begin listening, first create a TCPListenerConfig object to define how the listener should behave. A sample TCPListenerConfig might look like this:
 
 ```go
-cfg := BuffTCPListenerConfig {
+cfg := TCPListenerConfig {
   EnableLogging: false, // true will have log messages printed to stdout/stderr, via log
   MaxMessageSize: 4098,
   Callback: func(byte[])error{return nil} // Any function type that adheres to this signature, you'll need to deserialize in here if need be
@@ -122,10 +122,10 @@ The callback is currently run in it's own goroutine, which also handles reading 
 Writing messages
 ================
 
-To begin writing messages, you'll need to dial a BuffTCPWriter using BuffTCPWriterConfig
+To begin writing messages, you'll need to dial a TCPWriter using TCPWriterConfig
 
 ```go
-cfg := BuffTCPWriterConfig {
+cfg := TCPWriterConfig {
   EnableLogging: false, // true will have log messages printed to stdout/stderr, via log
   MaxMessageSize: 4098, // You want this to match the MaxMessageSize the server expects for messages on that socket
   Address: FormatAddress("127.0.0.1", strconv.Itoa(5031)) // Any address with the pattern ip:port. The FormatAddress helper is here for convenience.

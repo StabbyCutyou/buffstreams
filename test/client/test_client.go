@@ -14,7 +14,7 @@ import (
 // By default it points locally, but it can point to any network address
 // TODO Make that externally configurable to make automating the test easier
 func main() {
-	cfg := buffstreams.BuffTCPWriterConfig{
+	cfg := buffstreams.TCPWriterConfig{
 		MaxMessageSize: 2048,
 		EnableLogging:  true,
 		Address:        buffstreams.FormatAddress("127.0.0.1", strconv.Itoa(5031)),

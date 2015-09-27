@@ -5,9 +5,9 @@ import (
 	"net"
 )
 
-// BuffTCPWriter represents the abstraction over a raw TCP socket for writing streaming
+// TCPWriter represents the abstraction over a raw TCP socket for writing streaming
 // protocolbuffer data without having to write a ton of boilerplate
-type BuffTCPWriter struct {
+type TCPWriter struct {
 	socket         *net.TCPConn
 	address        string
 	headerByteSize int
@@ -15,9 +15,9 @@ type BuffTCPWriter struct {
 	enableLogging  bool
 }
 
-// BuffTCPWriterConfig representss the information needed to begin listening for
+// TCPWriterConfig representss the information needed to begin listening for
 // writing messages.
-type BuffTCPWriterConfig struct {
+type TCPWriterConfig struct {
 	// Controls how large the largest Message may be. The server will reject any messages whose clients
 	// header size does not match this configuration
 	MaxMessageSize int
@@ -28,7 +28,7 @@ type BuffTCPWriterConfig struct {
 }
 
 // open will dial a connection to the remote endpoint
-func (btw *BuffTCPWriter) open() error {
+func (btw *TCPWriter) open() error {
 	tcpAddr, err := net.ResolveTCPAddr("tcp", btw.address)
 	if err != nil {
 		return err
@@ -42,8 +42,8 @@ func (btw *BuffTCPWriter) open() error {
 }
 
 // Reopen allows you to close and re-establish a connection to the existing Address
-// without needing to create a whole new BuffTCPWriter object
-func (btw *BuffTCPWriter) Reopen() error {
+// without needing to create a whole new TCPWriter object
+func (btw *TCPWriter) Reopen() error {
 	if err := btw.Close(); err != nil {
 		return err
 	}
@@ -58,20 +58,20 @@ func (btw *BuffTCPWriter) Reopen() error {
 // Close will immediately call close on the connection to the remote endpoint. You
 // should not call this if other threads may be using the underlying socktet, unless
 // you control it in a mutex of some kind.
-func (btw *BuffTCPWriter) Close() error {
+func (btw *TCPWriter) Close() error {
 	return btw.socket.Close()
 }
 
-// DialBuffTCP creates a BuffTCPWriter, and dials a connection to the remote
+// DialBuffTCP creates a TCPWriter, and dials a connection to the remote
 // endpoint. It does not begin writing anything until you begin to do so
-func DialBuffTCP(cfg BuffTCPWriterConfig) (*BuffTCPWriter, error) {
+func DialBuffTCP(cfg TCPWriterConfig) (*TCPWriter, error) {
 	maxMessageSize := DefaultMaxMessageSize
 	// 0 is the default, and the message must be atleast 1 byte large
 	if cfg.MaxMessageSize != 0 {
 		maxMessageSize = cfg.MaxMessageSize
 	}
 
-	btw := &BuffTCPWriter{
+	btw := &TCPWriter{
 		enableLogging:  cfg.EnableLogging,
 		maxMessageSize: maxMessageSize,
 		headerByteSize: messageSizeToBitLength(maxMessageSize),
@@ -87,7 +87,7 @@ func DialBuffTCP(cfg BuffTCPWriterConfig) (*BuffTCPWriter, error) {
 // you pass in will be pre-pended with it's size. If the connection isn't open
 // you will receive an error. If not all bytes can be written, Write will keep
 // trying until the full message is delivered, or the connection is broken.
-func (btw *BuffTCPWriter) Write(data []byte) (int, error) {
+func (btw *TCPWriter) Write(data []byte) (int, error) {
 	// Calculate how big the message is, using a consistent header size.
 	msgLenHeader := uInt16ToByteArray(uint16(len(data)), btw.headerByteSize)
 	// Append the size to the message, so now it has a header

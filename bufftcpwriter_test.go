@@ -18,21 +18,21 @@ func exampleCallback(bts []byte) error {
 }
 
 var (
-	writeConfig = BuffTCPWriterConfig{
+	writeConfig = TCPWriterConfig{
 		MaxMessageSize: 2048,
 		EnableLogging:  true,
 		Address:        FormatAddress("127.0.0.1", strconv.Itoa(5033)),
 	}
 
-	listenConfig = BuffTCPListenerConfig{
+	listenConfig = TCPListenerConfig{
 		MaxMessageSize: 2048,
 		EnableLogging:  true,
 		Address:        FormatAddress("", strconv.Itoa(5033)),
 		Callback:       exampleCallback,
 	}
 
-	btl      = &BuffTCPListener{}
-	btw      = &BuffTCPWriter{}
+	btl      = &TCPListener{}
+	btw      = &TCPWriter{}
 	name     = "Stabby"
 	date     = time.Now().UnixNano()
 	data     = "This is an intenntionally long and rambling sentence to pad out the size of the message."
@@ -56,7 +56,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestDialBuffTCPUsesDefaultMessageSize(t *testing.T) {
-	cfg := BuffTCPWriterConfig{
+	cfg := TCPWriterConfig{
 		Address: writeConfig.Address,
 	}
 	buffM, err := DialBuffTCP(cfg)
@@ -69,7 +69,7 @@ func TestDialBuffTCPUsesDefaultMessageSize(t *testing.T) {
 }
 
 func TestDialBuffTCPUsesSpecifiedMaxMessageSize(t *testing.T) {
-	cfg := BuffTCPWriterConfig{
+	cfg := TCPWriterConfig{
 		Address:        writeConfig.Address,
 		MaxMessageSize: 8196,
 	}

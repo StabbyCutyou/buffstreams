@@ -14,9 +14,9 @@ import (
 // return an error, which in turn will be logged if EnableLogging is set to true.
 type ListenCallback func([]byte) error
 
-// BuffTCPListener represents the abstraction over a raw TCP socket for reading streaming
+// TCPListener represents the abstraction over a raw TCP socket for reading streaming
 // protocolbuffer data without having to write a ton of boilerplate
-type BuffTCPListener struct {
+type TCPListener struct {
 	socket                   *net.TCPListener
 	listeningShutDownChannel chan (bool)
 	address                  string
@@ -27,9 +27,9 @@ type BuffTCPListener struct {
 	shutdownChannel          chan (bool)
 }
 
-// BuffTCPListenerConfig representss the information needed to begin listening for
+// TCPListenerConfig representss the information needed to begin listening for
 // incoming messages.
-type BuffTCPListenerConfig struct {
+type TCPListenerConfig struct {
 	// Controls how large the largest Message may be. The server will reject any messages whose clients
 	// header size does not match this configuration
 	MaxMessageSize int
@@ -44,16 +44,16 @@ type BuffTCPListenerConfig struct {
 	Callback ListenCallback
 }
 
-// ListenBuffTCP creates a BuffTCPListener, and opens it's local connection to
+// ListenBuffTCP creates a TCPListener, and opens it's local connection to
 // allow it to begin receiving, once you're ready to. So the connection is open,
 // but it is not yet attempting to handle connections.
-func ListenBuffTCP(cfg BuffTCPListenerConfig) (*BuffTCPListener, error) {
+func ListenBuffTCP(cfg TCPListenerConfig) (*TCPListener, error) {
 	maxMessageSize := DefaultMaxMessageSize
 	// 0 is the default, and the message must be atleast 1 byte large
 	if cfg.MaxMessageSize != 0 {
 		maxMessageSize = cfg.MaxMessageSize
 	}
-	btl := &BuffTCPListener{
+	btl := &TCPListener{
 		enableLogging:   cfg.EnableLogging,
 		maxMessageSize:  maxMessageSize,
 		headerByteSize:  messageSizeToBitLength(maxMessageSize),
@@ -71,7 +71,7 @@ func ListenBuffTCP(cfg BuffTCPListenerConfig) (*BuffTCPListener, error) {
 
 // Actually blocks the thread it's running on, and begins handling incoming
 // requests
-func (btl *BuffTCPListener) blockListen() error {
+func (btl *TCPListener) blockListen() error {
 	for {
 		// Wait for someone to connect
 		conn, err := btl.socket.AcceptTCP()
@@ -98,7 +98,7 @@ func (btl *BuffTCPListener) blockListen() error {
 // This is only ever called from either StartListening or StartListeningAsync
 // Theres no need to lock, it will only ever be called upon choosing to start
 // to listen, by design. Maybe that'll have to change at some point.
-func (btl *BuffTCPListener) openSocket() error {
+func (btl *TCPListener) openSocket() error {
 	tcpAddr, err := net.ResolveTCPAddr("tcp", btl.address)
 	if err != nil {
 		return err
@@ -114,20 +114,20 @@ func (btl *BuffTCPListener) openSocket() error {
 // StartListening represents a way to start accepting TCP connections, which are
 // handled by the Callback provided upon initialization. This method will block
 // the current executing thread / go-routine.
-func (btl *BuffTCPListener) StartListening() error {
+func (btl *TCPListener) StartListening() error {
 	return btl.blockListen()
 }
 
 // Close represents a way to signal to the Listener that it should no longer accept
 // incoming connections, and begin to shutdown.
-func (btl *BuffTCPListener) Close() {
+func (btl *TCPListener) Close() {
 	btl.shutdownChannel <- true
 }
 
 // StartListeningAsync represents a way to start accepting TCP connections, which are
 // handled by the Callback provided upon initialization. It does the listening
 // in a go-routine, so as not to block.
-func (btl *BuffTCPListener) StartListeningAsync() error {
+func (btl *TCPListener) StartListeningAsync() error {
 	var err error
 	go func() {
 		err = btl.blockListen()
