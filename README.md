@@ -60,6 +60,8 @@ Import the library
 import "github.com/StabbyCutyou/buffstreams"
 ```
 
+For a quick example of a complete end to end client and server, check out the examples in the test/ directory, namely test/client/test_client.go and test/server/test_server.go. These two files are designed to work together to demonstrate an end to end integration of Buffstreams, in the simplest possible way.
+
 Listening for connections
 =========================
 
