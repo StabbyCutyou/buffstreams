@@ -16,14 +16,13 @@ type ListenCallback func([]byte) error
 // TCPListener represents the abstraction over a raw TCP socket for reading streaming
 // protocolbuffer data without having to write a ton of boilerplate
 type TCPListener struct {
-	socket                   *net.TCPListener
-	listeningShutDownChannel chan (bool)
-	address                  string
-	headerByteSize           int
-	maxMessageSize           int
-	enableLogging            bool
-	callback                 ListenCallback
-	shutdownChannel          chan (bool)
+	socket          *net.TCPListener
+	address         string
+	headerByteSize  int
+	maxMessageSize  int
+	enableLogging   bool
+	callback        ListenCallback
+	shutdownChannel chan struct{}
 }
 
 // TCPListenerConfig representss the information needed to begin listening for
@@ -57,7 +56,7 @@ func ListenTCP(cfg TCPListenerConfig) (*TCPListener, error) {
 		maxMessageSize:  maxMessageSize,
 		headerByteSize:  messageSizeToBitLength(maxMessageSize),
 		callback:        cfg.Callback,
-		shutdownChannel: make(chan (bool), 1),
+		shutdownChannel: make(chan struct{}, 1),
 		address:         cfg.Address,
 	}
 
@@ -120,7 +119,7 @@ func (btl *TCPListener) StartListening() error {
 // Close represents a way to signal to the Listener that it should no longer accept
 // incoming connections, and begin to shutdown.
 func (btl *TCPListener) Close() {
-	btl.shutdownChannel <- true
+	btl.shutdownChannel <- struct{}{}
 }
 
 // StartListeningAsync represents a way to start accepting TCP connections, which are
