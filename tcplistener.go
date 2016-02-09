@@ -88,7 +88,7 @@ func (btl *TCPListener) blockListen() error {
 			}
 		} else {
 			// Hand this off and immediately listen for more
-			go handleListenedConn(btl.address, conn, btl.headerByteSize, btl.maxMessageSize, btl.enableLogging, btl.callback)
+			go handleListenedConn(btl.address, conn, btl.headerByteSize, btl.maxMessageSize, btl.enableLogging, btl.callback, btl.shutdownChannel)
 		}
 	}
 }
@@ -119,7 +119,7 @@ func (btl *TCPListener) StartListening() error {
 // Close represents a way to signal to the Listener that it should no longer accept
 // incoming connections, and begin to shutdown.
 func (btl *TCPListener) Close() {
-	btl.shutdownChannel <- struct{}{}
+	close(btl.shutdownChannel)
 }
 
 // StartListeningAsync represents a way to start accepting TCP connections, which are
@@ -135,7 +135,7 @@ func (btl *TCPListener) StartListeningAsync() error {
 
 // Handles each incoming connection, run within it's own goroutine. This method will
 // loop until the client disconnects or another error occurs and is not handled
-func handleListenedConn(address string, conn *net.TCPConn, headerByteSize int, maxMessageSize int, enableLogging bool, cb ListenCallback) {
+func handleListenedConn(address string, conn *net.TCPConn, headerByteSize int, maxMessageSize int, enableLogging bool, cb ListenCallback, sdChan chan struct{}) {
 	// If there is any error, close the connection officially and break out of the listen-loop.
 	// We don't store these connections anywhere else, and if we can't recover from an error on the socket
 	// we want to kill the connection, exit the goroutine, and let the client handle re-connecting if need be.
@@ -147,6 +147,18 @@ func handleListenedConn(address string, conn *net.TCPConn, headerByteSize int, m
 	headerBuffer := make([]byte, headerByteSize)
 	dataBuffer := make([]byte, maxMessageSize)
 	for {
+		// Before we try reading a message, check to see if we've been shutdown or not
+		// That way, shutting down will allow any current message to finish, but block
+		// any receives on the connection after it occurs, in addition to blocking new
+		// connections from being accepted, above in the initial connection code.
+		select {
+		case <-sdChan:
+			conn.Close()
+			return
+		default:
+			// Nothing, continue on to accept incoming bytes
+		}
+
 		var headerReadError error
 		var totalHeaderBytesRead = 0
 		var bytesRead = 0
