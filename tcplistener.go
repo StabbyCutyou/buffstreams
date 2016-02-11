@@ -56,7 +56,7 @@ func ListenTCP(cfg TCPListenerConfig) (*TCPListener, error) {
 		maxMessageSize:  maxMessageSize,
 		headerByteSize:  messageSizeToBitLength(maxMessageSize),
 		callback:        cfg.Callback,
-		shutdownChannel: make(chan struct{}, 1),
+		shutdownChannel: make(chan struct{}),
 		address:         cfg.Address,
 	}
 
