@@ -6,7 +6,7 @@ import (
 )
 
 // TCPWriter represents the abstraction over a raw TCP socket for writing streaming
-// protocolbuffer data without having to write a ton of boilerplate
+// protocolbuffer data without having to write a ton of boilerplate.
 type TCPWriter struct {
 	socket         *net.TCPConn
 	address        string
@@ -19,15 +19,15 @@ type TCPWriter struct {
 // writing messages.
 type TCPWriterConfig struct {
 	// Controls how large the largest Message may be. The server will reject any messages whose clients
-	// header size does not match this configuration
+	// header size does not match this configuration.
 	MaxMessageSize int
-	// Controls the ability to enable logging errors occuring in the library
+	// Controls the ability to enable logging errors occuring in the library.
 	EnableLogging bool
-	// Address is the address to connect to for writing streaming messages
+	// Address is the address to connect to for writing streaming messages.
 	Address string
 }
 
-// open will dial a connection to the remote endpoint
+// open will dial a connection to the remote endpoint.
 func (btw *TCPWriter) open() error {
 	tcpAddr, err := net.ResolveTCPAddr("tcp", btw.address)
 	if err != nil {
@@ -42,7 +42,7 @@ func (btw *TCPWriter) open() error {
 }
 
 // Reopen allows you to close and re-establish a connection to the existing Address
-// without needing to create a whole new TCPWriter object
+// without needing to create a whole new TCPWriter object.
 func (btw *TCPWriter) Reopen() error {
 	if err := btw.Close(); err != nil {
 		return err
@@ -55,15 +55,17 @@ func (btw *TCPWriter) Reopen() error {
 	return nil
 }
 
-// Close will immediately call close on the connection to the remote endpoint. You
-// should not call this if other threads may be using the underlying socktet, unless
-// you control it in a mutex of some kind.
+// Close will immediately call close on the connection to the remote endpoint. Per
+// the golang source code for the netFD object, this call uses a special mutex to
+// control access to the underlying pool of readers/writers. This call should be
+// threadsafe, so that any other threads writing will finish, or be blocked, when
+// this is invoked.
 func (btw *TCPWriter) Close() error {
 	return btw.socket.Close()
 }
 
 // DialTCP creates a TCPWriter, and dials a connection to the remote
-// endpoint. It does not begin writing anything until you begin to do so
+// endpoint. It does not begin writing anything until you begin to do so.
 func DialTCP(cfg TCPWriterConfig) (*TCPWriter, error) {
 	maxMessageSize := DefaultMaxMessageSize
 	// 0 is the default, and the message must be atleast 1 byte large
@@ -112,7 +114,7 @@ func (btw *TCPWriter) Write(data []byte) (int, error) {
 	// all of it.
 
 	// If both issues occurred, we'll need to find a way to determine if the error
-	// is recoverable (is the connection in a bad state) or not
+	// is recoverable (is the connection in a bad state) or not.
 
 	var writeError error
 	var totalBytesWritten = 0

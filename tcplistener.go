@@ -4,6 +4,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"sync"
 )
 
 // ListenCallback is a function type that calling code will need to implement in order
@@ -16,14 +17,14 @@ type ListenCallback func([]byte) error
 // TCPListener represents the abstraction over a raw TCP socket for reading streaming
 // protocolbuffer data without having to write a ton of boilerplate
 type TCPListener struct {
-	socket                   *net.TCPListener
-	listeningShutDownChannel chan (bool)
-	address                  string
-	headerByteSize           int
-	maxMessageSize           int
-	enableLogging            bool
-	callback                 ListenCallback
-	shutdownChannel          chan (bool)
+	socket          *net.TCPListener
+	address         string
+	headerByteSize  int
+	maxMessageSize  int
+	enableLogging   bool
+	callback        ListenCallback
+	shutdownChannel chan struct{}
+	shutdownGroup   *sync.WaitGroup
 }
 
 // TCPListenerConfig representss the information needed to begin listening for
@@ -57,8 +58,9 @@ func ListenTCP(cfg TCPListenerConfig) (*TCPListener, error) {
 		maxMessageSize:  maxMessageSize,
 		headerByteSize:  messageSizeToBitLength(maxMessageSize),
 		callback:        cfg.Callback,
-		shutdownChannel: make(chan (bool), 1),
+		shutdownChannel: make(chan struct{}),
 		address:         cfg.Address,
+		shutdownGroup:   &sync.WaitGroup{},
 	}
 
 	if err := btl.openSocket(); err != nil {
@@ -89,7 +91,7 @@ func (btl *TCPListener) blockListen() error {
 			}
 		} else {
 			// Hand this off and immediately listen for more
-			go handleListenedConn(btl.address, conn, btl.headerByteSize, btl.maxMessageSize, btl.enableLogging, btl.callback)
+			go handleListenedConn(btl.address, conn, btl.headerByteSize, btl.maxMessageSize, btl.enableLogging, btl.callback, btl.shutdownChannel, btl.shutdownGroup)
 		}
 	}
 }
@@ -120,7 +122,8 @@ func (btl *TCPListener) StartListening() error {
 // Close represents a way to signal to the Listener that it should no longer accept
 // incoming connections, and begin to shutdown.
 func (btl *TCPListener) Close() {
-	btl.shutdownChannel <- true
+	close(btl.shutdownChannel)
+	btl.shutdownGroup.Wait()
 }
 
 // StartListeningAsync represents a way to start accepting TCP connections, which are
@@ -136,17 +139,28 @@ func (btl *TCPListener) StartListeningAsync() error {
 
 // Handles each incoming connection, run within it's own goroutine. This method will
 // loop until the client disconnects or another error occurs and is not handled
-func handleListenedConn(address string, conn *net.TCPConn, headerByteSize int, maxMessageSize int, enableLogging bool, cb ListenCallback) {
-	// If there is any error, close the connection officially and break out of the listen-loop.
-	// We don't store these connections anywhere else, and if we can't recover from an error on the socket
-	// we want to kill the connection, exit the goroutine, and let the client handle re-connecting if need be.
-	// Handle getting the data header
-
+func handleListenedConn(address string, conn *net.TCPConn, headerByteSize int, maxMessageSize int, enableLogging bool, cb ListenCallback, sdChan <-chan struct{}, sdGroup *sync.WaitGroup) {
+	// Increment the waitGroup in the event of a shutdown
+	sdGroup.Add(1)
+	defer sdGroup.Done()
 	// We can cheat a tiny bit here, and only allocate this buffer one time. It will be overwritten on each call
 	// to read, and we always pass in a slice the size of the total bytes read so far, so there should
 	// never be any resultant cross-contamination from earlier runs of the loop.
 	headerBuffer := make([]byte, headerByteSize)
 	dataBuffer := make([]byte, maxMessageSize)
+	// Start an asyncrhonous call that will wait on the shutdown channel, and then close
+	// the connection. This will let us respond to the shutdown but also not incur
+	// a cost for checking the channel on each run of the loop
+	go func(c *net.TCPConn, s <-chan struct{}) {
+		<-s
+		c.Close()
+	}(conn, sdChan)
+
+	// Begin the read loop
+	// If there is any error, close the connection officially and break out of the listen-loop.
+	// We don't store these connections anywhere else, and if we can't recover from an error on the socket
+	// we want to kill the connection, exit the goroutine, and let the client handle re-connecting if need be.
+	// Handle getting the data header
 	for {
 		var headerReadError error
 		var totalHeaderBytesRead = 0
