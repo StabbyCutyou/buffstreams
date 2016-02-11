@@ -146,19 +146,14 @@ func handleListenedConn(address string, conn *net.TCPConn, headerByteSize int, m
 	// never be any resultant cross-contamination from earlier runs of the loop.
 	headerBuffer := make([]byte, headerByteSize)
 	dataBuffer := make([]byte, maxMessageSize)
+	// Start an asyncrhonous call that will wait on the shutdown channel, and then close
+	// the connection. This will let us respond to the shutdown but also not incur
+	// a cost for checking the channel on each run of the loop
+	go func(c *net.TCPConn, s chan struct{}) {
+		<-s
+		c.Close()
+	}(conn, sdChan)
 	for {
-		// Before we try reading a message, check to see if we've been shutdown or not
-		// That way, shutting down will allow any current message to finish, but block
-		// any receives on the connection after it occurs, in addition to blocking new
-		// connections from being accepted, above in the initial connection code.
-		select {
-		case <-sdChan:
-			conn.Close()
-			return
-		default:
-			// Nothing, continue on to accept incoming bytes
-		}
-
 		var headerReadError error
 		var totalHeaderBytesRead = 0
 		var bytesRead = 0
