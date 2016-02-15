@@ -195,6 +195,11 @@ or
 err := bm.CloseWriter("127.0.0.1:5031")
 ```
 
+Thanks
+=======
+Special thanks to those who have reported bugs or helped me improve Buffstreams
+* Judson White
+
 Roadmap
 =======
 * Release proper set of benchmarks, including more real-world cases
