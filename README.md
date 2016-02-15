@@ -201,7 +201,6 @@ Roadmap
 * Configurable retry for the client, configurable errored-message queue for user to define failover process to handle.
 * Optional channel based streaming approach instead of callbacks
 * Further library optimizations via tools such as pprof
-* gb maybe?
 
 LICENSE
 =========
