@@ -161,7 +161,7 @@ Creating a Manager
 bm := buffstreams.NewManager()
 ```
 
-Listening on a port. Manager always makes this asyncrhonous and non blocking
+Listening on a port. Manager always makes this asynchronous and non blocking
 
 ```go
 // Assuming you've got a configuration object cfg, see above
