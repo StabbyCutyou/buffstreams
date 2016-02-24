@@ -15,7 +15,7 @@ type TCPWriter struct {
 	enableLogging  bool
 }
 
-// TCPWriterConfig representss the information needed to begin listening for
+// TCPWriterConfig represents the information needed to begin listening for
 // writing messages.
 type TCPWriterConfig struct {
 	// Controls how large the largest Message may be. The server will reject any messages whose clients
