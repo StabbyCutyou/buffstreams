@@ -72,32 +72,32 @@ func ListenTCP(cfg TCPListenerConfig) (*TCPListener, error) {
 
 // Actually blocks the thread it's running on, and begins handling incoming
 // requests
-func (btl *TCPListener) blockListen() error {
+func (t *TCPListener) blockListen() error {
 	for {
 		// Wait for someone to connect
-		c, err := btl.socket.AcceptTCP()
-		conn, err := newTCPConn(btl.connConfig)
+		c, err := t.socket.AcceptTCP()
+		conn, err := newTCPConn(t.connConfig)
 		if err != nil {
 			return err
 		}
 		// Don't dial out, wrap the underlying conn in one of ours
 		conn.socket = c
 		if err != nil {
-			if btl.enableLogging {
+			if t.enableLogging {
 				log.Printf("Error attempting to accept connection: %s", err)
 			}
 			// Stole this approach from http://zhen.org/blog/graceful-shutdown-of-go-net-dot-listeners/
 			// Benefits of a channel for the simplicity of use, but don't have to even check it
 			// unless theres an error, so performance impact to incoming conns should be lower
 			select {
-			case <-btl.shutdownChannel:
+			case <-t.shutdownChannel:
 				return nil
 			default:
 				// Nothing, continue to the top of the loop
 			}
 		} else {
 			// Hand this off and immediately listen for more
-			go btl.readLoop(conn)
+			go t.readLoop(conn)
 		}
 	}
 }
@@ -121,24 +121,24 @@ func (t *TCPListener) openSocket() error {
 // StartListening represents a way to start accepting TCP connections, which are
 // handled by the Callback provided upon initialization. This method will block
 // the current executing thread / go-routine.
-func (btl *TCPListener) StartListening() error {
-	return btl.blockListen()
+func (t *TCPListener) StartListening() error {
+	return t.blockListen()
 }
 
 // Close represents a way to signal to the Listener that it should no longer accept
 // incoming connections, and begin to shutdown.
-func (btl *TCPListener) Close() {
-	close(btl.shutdownChannel)
-	btl.shutdownGroup.Wait()
+func (t *TCPListener) Close() {
+	close(t.shutdownChannel)
+	t.shutdownGroup.Wait()
 }
 
 // StartListeningAsync represents a way to start accepting TCP connections, which are
 // handled by the Callback provided upon initialization. It does the listening
 // in a go-routine, so as not to block.
-func (btl *TCPListener) StartListeningAsync() error {
+func (t *TCPListener) StartListeningAsync() error {
 	var err error
 	go func() {
-		err = btl.blockListen()
+		err = t.blockListen()
 	}()
 	return err
 }

@@ -160,13 +160,16 @@ func (c *TCPConn) Write(data []byte) (int, error) {
 	return totalBytesWritten, writeError
 }
 
-func (c *TCPConn) lowLevelRead(buffer []byte, toRead int) (int, error) {
+func (c *TCPConn) lowLevelRead(buffer []byte) (int, error) {
 	var totalBytesRead = 0
 	var err error
 	var bytesRead = 0
+	var toRead = len(buffer)
 	// This fills the buffer
+	bytesRead, err = c.socket.Read(buffer)
+	totalBytesRead += bytesRead
 	for totalBytesRead < toRead && err == nil {
-		bytesRead, err = c.socket.Read(buffer[totalBytesRead:toRead])
+		bytesRead, err = c.socket.Read(buffer[totalBytesRead:])
 		totalBytesRead += bytesRead
 	}
 
@@ -188,7 +191,7 @@ func (c *TCPConn) lowLevelRead(buffer []byte, toRead int) (int, error) {
 
 func (c *TCPConn) Read(b []byte) (int, error) {
 	// Read the header
-	hLength, err := c.lowLevelRead(c.incomingHeaderBuffer, c.headerByteSize)
+	hLength, err := c.lowLevelRead(c.incomingHeaderBuffer)
 	if err != nil {
 		return hLength, err
 	}
@@ -205,8 +208,7 @@ func (c *TCPConn) Read(b []byte) (int, error) {
 	}
 
 	// Using the header, read the remaining body
-
-	bLength, err := c.lowLevelRead(b, int(msgLength))
+	bLength, err := c.lowLevelRead(b[:msgLength])
 	if err != nil {
 		c.Close()
 	}

@@ -23,6 +23,11 @@ var (
 		Address:        FormatAddress("127.0.0.1", strconv.Itoa(5034)),
 	}
 
+	buffWriteConfig2 = TCPConnConfig{
+		MaxMessageSize: 2048,
+		Address:        FormatAddress("127.0.0.1", strconv.Itoa(5035)),
+	}
+
 	listenConfig = TCPListenerConfig{
 		MaxMessageSize: 2048,
 		EnableLogging:  true,
@@ -37,9 +42,18 @@ var (
 		Callback:       exampleCallback,
 	}
 
+	listenConfig3 = TCPListenerConfig{
+		MaxMessageSize: 2048,
+		EnableLogging:  true,
+		Address:        FormatAddress("", strconv.Itoa(5035)),
+		Callback:       exampleCallback,
+	}
+
 	btl      = &TCPListener{}
 	btl2     = &TCPListener{}
+	btl3     = &TCPListener{}
 	btc      = &TCPConn{}
+	btc2     = &TCPConn{}
 	name     = "Stabby"
 	date     = time.Now().UnixNano()
 	data     = "This is an intenntionally long and rambling sentence to pad out the size of the message."
@@ -58,7 +72,16 @@ func TestMain(m *testing.M) {
 		log.Fatal(err)
 	}
 	btl2.StartListeningAsync()
-	btc, err = DialTCP2(&buffWriteConfig)
+	btl3, err = ListenTCP(listenConfig3)
+	if err != nil {
+		log.Fatal(err)
+	}
+	btl3.StartListeningAsync()
+	btc, err = DialTCP(&buffWriteConfig)
+	if err != nil {
+		log.Fatal(err)
+	}
+	btc2, err = DialTCP(&buffWriteConfig2)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -69,7 +92,7 @@ func TestDialBuffTCPUsesDefaultMessageSize(t *testing.T) {
 	cfg := TCPConnConfig{
 		Address: buffWriteConfig.Address,
 	}
-	buffM, err := DialTCP2(&cfg)
+	buffM, err := DialTCP(&cfg)
 	if err != nil {
 		t.Errorf("Failed to open connection to %d: %s", cfg.Address, err)
 	}
@@ -83,7 +106,7 @@ func TestDialBuffTCPUsesSpecifiedMaxMessageSize(t *testing.T) {
 		Address:        buffWriteConfig.Address,
 		MaxMessageSize: 8196,
 	}
-	conn, err := DialTCP2(&cfg)
+	conn, err := DialTCP(&cfg)
 	if err != nil {
 		t.Errorf("Failed to open connection to %d: %s", cfg.Address, err)
 	}
@@ -95,5 +118,11 @@ func TestDialBuffTCPUsesSpecifiedMaxMessageSize(t *testing.T) {
 func BenchmarkWrite(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		btc.Write(msgBytes)
+	}
+}
+
+func BenchmarkWrite2(b *testing.B) {
+	for n := 0; n < b.N; n++ {
+		btc2.Write(msgBytes)
 	}
 }
