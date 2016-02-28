@@ -27,7 +27,7 @@ type testController struct {
 
 func main() {
 	tc := &testController{
-		enableLogging: true,
+		enableLogging: false,
 	}
 	cfg := buffstreams.TCPListenerConfig{
 		MaxMessageSize: 2048,

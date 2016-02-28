@@ -18,10 +18,9 @@ func exampleCallback(bts []byte) error {
 }
 
 var (
-	writeConfig = TCPWriterConfig{
+	buffWriteConfig = TCPConnConfig{
 		MaxMessageSize: 2048,
-		EnableLogging:  true,
-		Address:        FormatAddress("127.0.0.1", strconv.Itoa(5033)),
+		Address:        FormatAddress("127.0.0.1", strconv.Itoa(5034)),
 	}
 
 	listenConfig = TCPListenerConfig{
@@ -31,8 +30,16 @@ var (
 		Callback:       exampleCallback,
 	}
 
+	listenConfig2 = TCPListenerConfig{
+		MaxMessageSize: 2048,
+		EnableLogging:  true,
+		Address:        FormatAddress("", strconv.Itoa(5034)),
+		Callback:       exampleCallback,
+	}
+
 	btl      = &TCPListener{}
-	btw      = &TCPWriter{}
+	btl2     = &TCPListener{}
+	btc      = &TCPConn{}
 	name     = "Stabby"
 	date     = time.Now().UnixNano()
 	data     = "This is an intenntionally long and rambling sentence to pad out the size of the message."
@@ -46,20 +53,23 @@ func TestMain(m *testing.M) {
 		log.Fatal(err)
 	}
 	btl.StartListeningAsync()
-	btw, err = DialTCP(writeConfig)
+	btl2, err = ListenTCP(listenConfig2)
+	if err != nil {
+		log.Fatal(err)
+	}
+	btl2.StartListeningAsync()
+	btc, err = DialTCP2(&buffWriteConfig)
 	if err != nil {
 		log.Fatal(err)
 	}
 	os.Exit(m.Run())
-	btw.Close()
-	btl.Close()
 }
 
 func TestDialBuffTCPUsesDefaultMessageSize(t *testing.T) {
-	cfg := TCPWriterConfig{
-		Address: writeConfig.Address,
+	cfg := TCPConnConfig{
+		Address: buffWriteConfig.Address,
 	}
-	buffM, err := DialTCP(cfg)
+	buffM, err := DialTCP2(&cfg)
 	if err != nil {
 		t.Errorf("Failed to open connection to %d: %s", cfg.Address, err)
 	}
@@ -69,21 +79,21 @@ func TestDialBuffTCPUsesDefaultMessageSize(t *testing.T) {
 }
 
 func TestDialBuffTCPUsesSpecifiedMaxMessageSize(t *testing.T) {
-	cfg := TCPWriterConfig{
-		Address:        writeConfig.Address,
+	cfg := TCPConnConfig{
+		Address:        buffWriteConfig.Address,
 		MaxMessageSize: 8196,
 	}
-	buffM, err := DialTCP(cfg)
+	conn, err := DialTCP2(&cfg)
 	if err != nil {
 		t.Errorf("Failed to open connection to %d: %s", cfg.Address, err)
 	}
-	if buffM.maxMessageSize != cfg.MaxMessageSize {
-		t.Errorf("Expected Max Message Size to be %d, actually got %d", cfg.MaxMessageSize, buffM.maxMessageSize)
+	if conn.maxMessageSize != cfg.MaxMessageSize {
+		t.Errorf("Expected Max Message Size to be %d, actually got %d", cfg.MaxMessageSize, conn.maxMessageSize)
 	}
 }
 
 func BenchmarkWrite(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		btw.Write(msgBytes)
+		btc.Write(msgBytes)
 	}
 }

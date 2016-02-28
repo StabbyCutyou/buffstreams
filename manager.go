@@ -93,7 +93,7 @@ func (bm *Manager) Dial(cfg TCPWriterConfig) error {
 		return ErrAlreadyOpened
 	}
 
-	btw, err := DialTCP(cfg)
+	btw, err := XDialTCP(cfg)
 	if err != nil {
 		return err
 	}
