@@ -124,10 +124,10 @@ The callback is currently run in it's own goroutine, which also handles reading 
 Writing messages
 ================
 
-To begin writing messages, you'll need to dial a TCPWriter using TCPWriterConfig
+To begin writing messages to a new connection, you'll need to dial a using TCPConnConfig
 
 ```go
-cfg := TCPWriterConfig {
+cfg := TCPConnConfig {
   EnableLogging: false, // true will have log messages printed to stdout/stderr, via log
   MaxMessageSize: 4098, // You want this to match the MaxMessageSize the server expects for messages on that socket
   Address: FormatAddress("127.0.0.1", strconv.Itoa(5031)) // Any address with the pattern ip:port. The FormatAddress helper is here for convenience.
@@ -137,13 +137,15 @@ cfg := TCPWriterConfig {
 Once you have a configuration object, you can Dial out.
 
 ```go
-btw, err := buffstreams.DialTCP(cfg)
+btc, err := buffstreams.DialTCP(cfg)
 ```
 
-This will open a connection to the endpoint at the specified location. From there, you can write your data
+This will open a connection to the endpoint at the specified location. Additionally, the TCPConn that the TCPListener returns will also allow you to write data, using the same methods as below.
+
+From there, you can write your data
 
 ```go
-  bytesWritten, err := btw.Write(msgBytes, true)
+  bytesWritten, err := btc.Write(msgBytes, true)
 ```
 
 If there is an error in writing, that connection will be closed and be reopened on the next write. There is no guarantee if any the bytesWritten value will be >0 or not in the event of an error which results in a reconnect.

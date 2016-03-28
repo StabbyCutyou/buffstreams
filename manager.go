@@ -19,7 +19,7 @@ var ErrNotOpened = errors.New("A connection to this ip / port must be opened fir
 // This is to make it easy to work with wire formats like ProtocolBuffers, which require
 // a custom-delimeter situation to be sent in a streaming fashion.
 type Manager struct {
-	dialedConnections map[string]*TCPWriter
+	dialedConnections map[string]*TCPConn
 	listeningSockets  map[string]*TCPListener
 	dialerLock        *sync.RWMutex
 	listenerLock      *sync.Mutex
@@ -28,7 +28,7 @@ type Manager struct {
 // NewManager creates a new *Manager based on the provided ManagerConfig
 func NewManager() *Manager {
 	bm := &Manager{
-		dialedConnections: make(map[string]*TCPWriter),
+		dialedConnections: make(map[string]*TCPConn),
 		listeningSockets:  make(map[string]*TCPListener),
 		dialerLock:        &sync.RWMutex{},
 		listenerLock:      &sync.Mutex{},
@@ -86,7 +86,7 @@ func (bm *Manager) CloseListener(address string) error {
 // the TCPWriter makes every attempt to continue to send bytes until they are all
 // written, you should always check to make sure this number matches the bytes you
 // attempted to write, due to very exceptional cases.
-func (bm *Manager) Dial(cfg TCPWriterConfig) error {
+func (bm *Manager) Dial(cfg *TCPConnConfig) error {
 	bm.dialerLock.Lock()
 	defer bm.dialerLock.Unlock()
 	if _, ok := bm.dialedConnections[cfg.Address]; ok {
