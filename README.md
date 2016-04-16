@@ -72,7 +72,7 @@ To begin listening, first create a TCPListenerConfig object to define how the li
 ```go
 cfg := TCPListenerConfig {
   EnableLogging: false, // true will have log messages printed to stdout/stderr, via log
-  MaxMessageSize: 4098,
+  MaxMessageSize: 4096,
   Callback: func(byte[])error{return nil} // Any function type that adheres to this signature, you'll need to deserialize in here if need be
   Address: FormatAddress("", strconv.Itoa(5031)) // Any address with the pattern ip:port. The FormatAddress helper is here for convenience. For listening, you normally don't want to provide an ip unless you have a reason.
 }
@@ -129,7 +129,7 @@ To begin writing messages to a new connection, you'll need to dial a using TCPCo
 ```go
 cfg := TCPConnConfig {
   EnableLogging: false, // true will have log messages printed to stdout/stderr, via log
-  MaxMessageSize: 4098, // You want this to match the MaxMessageSize the server expects for messages on that socket
+  MaxMessageSize: 4096, // You want this to match the MaxMessageSize the server expects for messages on that socket
   Address: FormatAddress("127.0.0.1", strconv.Itoa(5031)) // Any address with the pattern ip:port. The FormatAddress helper is here for convenience.
 }
 ```
