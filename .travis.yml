@@ -12,3 +12,4 @@ go:
 
 install:
   - go get github.com/golang/protobuf/proto
+  - go get github.com/orcaman/concurrent-map
