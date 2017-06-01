@@ -40,6 +40,10 @@ type TCPConnConfig struct {
 	MaxMessageSize int
 	// Address is the address to connect to for writing streaming messages.
 	Address string
+
+	//Delimiter if any
+	DelimiterPresent bool
+	Delimiter byte
 }
 
 func newTCPConn(cfg *TCPConnConfig) (*TCPConn, error) {

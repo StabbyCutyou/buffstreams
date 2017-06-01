@@ -39,6 +39,11 @@ type TCPListenerConfig struct {
 	// is your responsibility to handle parsing the incoming message and handling errors
 	// inside the callback
 	Callback ListenCallback
+
+	//Delimiter if any
+	DelimiterPresent bool
+	Delimiter byte
+
 }
 
 // ListenTCP creates a TCPListener, and opens it's local connection to
@@ -53,6 +58,8 @@ func ListenTCP(cfg TCPListenerConfig) (*TCPListener, error) {
 	connCfg := TCPConnConfig{
 		MaxMessageSize: maxMessageSize,
 		Address:        cfg.Address,
+		DelimiterPresent: cfg.DelimiterPresent,
+		Delimiter: cfg.Delimiter,
 	}
 
 	btl := &TCPListener{
@@ -166,6 +173,27 @@ func (t *TCPListener) readLoop(conn *TCPConn) {
 	// we want to kill the connection, exit the goroutine, and let the client handle re-connecting if need be.
 	// Handle getting the data header
 	for {
+		//Here Check whether to look for Delimiter or not
+		if TCPListener.connConfig.DelimiterPresent{
+			buffer :=make([]byte,1)
+
+			//Read until we find the Delimiter
+			for {
+				_, errr := conn.socket.Read(buffer)
+
+				if errr!=nil{
+					conn.Close()
+					if t.enableLogging {
+						log.Printf("Address %s: Failure to read from connection. Underlying error: %s", conn.address, err)
+					}
+					return
+				}
+				if (buffer[0] == TCPListener.connConfig.Delimiter){
+					log.Println("Sync Found :)")
+					break
+				}
+			}
+		}
 		msgLen, err := conn.Read(dataBuffer)
 		if err != nil {
 			if t.enableLogging {
