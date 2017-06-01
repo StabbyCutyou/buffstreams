@@ -3,6 +3,7 @@ package buffstreams
 import (
 	"errors"
 	"sync"
+	"github.com/orcaman/concurrent-map"
 )
 
 // ErrAlreadyOpened represents the error where a caller has tried to open the same
@@ -12,6 +13,9 @@ var ErrAlreadyOpened = errors.New("A connection to this ip / port is already ope
 // ErrNotOpened represents the error where a caller has tried to use a socket to
 // an address that they have not opened yet.
 var ErrNotOpened = errors.New("A connection to this ip / port must be opened first.")
+
+//For storing the Mapping of Address to TCP Connection
+var TcpClients cmap.ConcurrentMap
 
 // Manager represents the object used to govern interactions between tcp endpoints.
 // You can use it to read from and write to streaming or non-streaming TCP connections

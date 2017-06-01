@@ -4,6 +4,7 @@ import (
 	"log"
 	"net"
 	"sync"
+	"github.com/orcaman/concurrent-map"
 )
 
 // ListenCallback is a function type that calling code will need to implement in order
@@ -160,6 +161,11 @@ func (t *TCPListener) readLoop(conn *TCPConn) {
 		c.Close()
 	}(conn, t.shutdownChannel)
 
+	//Initialize TcpClients if not already done
+	if TcpClients==nil{
+		TcpClients = cmap.New()
+	}
+
 	// Begin the read loop
 	// If there is any error, close the connection officially and break out of the listen-loop.
 	// We don't store these connections anywhere else, and if we can't recover from an error on the socket
@@ -174,6 +180,11 @@ func (t *TCPListener) readLoop(conn *TCPConn) {
 			conn.Close()
 			return
 		}
+
+		//Get Client Address and Store it in concurrent map
+		client_addr := conn.socket.RemoteAddr().String()
+		TcpClients.Set(client_addr,conn)
+
 		// We take action on the actual message data - but only up to the amount of bytes read,
 		// since we re-use the cache
 		if err = t.callback(dataBuffer[:msgLen]); err != nil && t.enableLogging {
