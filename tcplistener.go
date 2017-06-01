@@ -174,21 +174,21 @@ func (t *TCPListener) readLoop(conn *TCPConn) {
 	// Handle getting the data header
 	for {
 		//Here Check whether to look for Delimiter or not
-		if TCPListener.connConfig.DelimiterPresent{
+		if t.connConfig.DelimiterPresent{
 			buffer :=make([]byte,1)
 
 			//Read until we find the Delimiter
 			for {
-				_, errr := conn.socket.Read(buffer)
+				_, err := conn.socket.Read(buffer)
 
-				if errr!=nil{
+				if err!=nil{
 					conn.Close()
 					if t.enableLogging {
 						log.Printf("Address %s: Failure to read from connection. Underlying error: %s", conn.address, err)
 					}
 					return
 				}
-				if (buffer[0] == TCPListener.connConfig.Delimiter){
+				if (buffer[0] == t.connConfig.Delimiter){
 					log.Println("Sync Found :)")
 					break
 				}
@@ -197,8 +197,8 @@ func (t *TCPListener) readLoop(conn *TCPConn) {
 		msgLen, err := conn.Read(dataBuffer)
 
 		//Uncomment if you want to add delimiter to the Packet
-		//if TCPListener.connConfig.DelimiterPresent{
-		//	dataBuffer = append(dataBuffer, TCPListener.connConfig.Delimiter)
+		//if t.connConfig.DelimiterPresent{
+		//	dataBuffer = append(dataBuffer, t.connConfig.Delimiter)
 		//	msgLen +=1
 		//}
 
