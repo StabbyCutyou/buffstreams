@@ -195,6 +195,13 @@ func (t *TCPListener) readLoop(conn *TCPConn) {
 			}
 		}
 		msgLen, err := conn.Read(dataBuffer)
+
+		//Uncomment if you want to add delimiter to the Packet
+		//if TCPListener.connConfig.DelimiterPresent{
+		//	dataBuffer = append(dataBuffer, TCPListener.connConfig.Delimiter)
+		//	msgLen +=1
+		//}
+
 		if err != nil {
 			if t.enableLogging {
 				log.Printf("Address %s: Failure to read from connection. Underlying error: %s", conn.address, err)
