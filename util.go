@@ -15,8 +15,6 @@ func intToByteArray(value int64, bufferSize int) []byte {
 	return toWriteLen
 }
 
-// Formula for taking size in bytes and calculating # of bits to express that size
-// http://www.exploringbinary.com/number-of-bits-in-a-decimal-integer/
 func messageSizeToBitLength(messageSize int) int {
 	bytes := float64(messageSize)
 	header := math.Ceil(math.Floor(math.Log2(bytes)+1)/8.0) + 1
