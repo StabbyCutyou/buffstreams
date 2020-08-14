@@ -12,11 +12,15 @@ import (
 
 // TestCallback is a simple server for test purposes. It has a single callback,
 // which is to unmarshall some data and log it.
-func (t *testController) TestCallback(bts []byte) error {
+func (t *testController) TestCallback(conn *buffstreams.TCPConn, bts []byte) error {
 	msg := &message.Note{}
 	err := proto.Unmarshal(bts, msg)
 	if t.enableLogging {
 		log.Print(msg.GetComment())
+		_, err := conn.Write([]byte(time.Now().String()))
+		if err != nil {
+			log.Println("Write error:", err)
+		}
 	}
 	return err
 }

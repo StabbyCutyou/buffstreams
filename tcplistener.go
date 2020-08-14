@@ -11,7 +11,7 @@ import (
 // size header, meaning you can directly serialize the raw slice. You would then perform your
 // custom logic for interpretting the message, before returning. You can optionally
 // return an error, which in turn will be logged if EnableLogging is set to true.
-type ListenCallback func([]byte) error
+type ListenCallback func(*TCPConn, []byte) error
 
 // TCPListener represents the abstraction over a raw TCP socket for reading streaming
 // protocolbuffer data without having to write a ton of boilerplate
@@ -76,12 +76,6 @@ func (t *TCPListener) blockListen() error {
 	for {
 		// Wait for someone to connect
 		c, err := t.socket.AcceptTCP()
-		conn, err := newTCPConn(t.connConfig)
-		if err != nil {
-			return err
-		}
-		// Don't dial out, wrap the underlying conn in one of ours
-		conn.socket = c
 		if err != nil {
 			if t.enableLogging {
 				log.Printf("Error attempting to accept connection: %s", err)
@@ -95,10 +89,14 @@ func (t *TCPListener) blockListen() error {
 			default:
 				// Nothing, continue to the top of the loop
 			}
-		} else {
-			// Hand this off and immediately listen for more
-			go t.readLoop(conn)
+
+			continue
 		}
+
+		conn, _ := newTCPConn(t.connConfig)
+		// Don't dial out, wrap the underlying conn in one of ours
+		conn.socket = c
+		go t.readLoop(conn)
 	}
 }
 
@@ -152,13 +150,21 @@ func (t *TCPListener) readLoop(conn *TCPConn) {
 	// dataBuffer will hold the message from each read
 	dataBuffer := make([]byte, conn.maxMessageSize)
 
+	closed := make(chan struct{})
+
+	defer close(closed)
+
 	// Start an asyncrhonous call that will wait on the shutdown channel, and then close
 	// the connection. This will let us respond to the shutdown but also not incur
 	// a cost for checking the channel on each run of the loop
-	go func(c *TCPConn, s <-chan struct{}) {
-		<-s
-		c.Close()
-	}(conn, t.shutdownChannel)
+	go func(c *TCPConn, s <-chan struct{}, closed <-chan struct{}) {
+		select {
+		case <-closed:
+			return
+		case <-s:
+			c.Close()
+		}
+	}(conn, t.shutdownChannel, closed)
 
 	// Begin the read loop
 	// If there is any error, close the connection officially and break out of the listen-loop.
@@ -176,7 +182,7 @@ func (t *TCPListener) readLoop(conn *TCPConn) {
 		}
 		// We take action on the actual message data - but only up to the amount of bytes read,
 		// since we re-use the cache
-		if err = t.callback(dataBuffer[:msgLen]); err != nil && t.enableLogging {
+		if err = t.callback(conn, dataBuffer[:msgLen]); err != nil && t.enableLogging {
 			log.Printf("Error in Callback: %s", err.Error())
 			// TODO if it's a protobuffs error, it means we likely had an issue and can't
 			// deserialize data? Should we kill the connection and have the client start over?
