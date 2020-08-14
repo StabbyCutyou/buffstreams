@@ -18,6 +18,7 @@ func main() {
 		MaxMessageSize: 2048,
 		Address:        buffstreams.FormatAddress("127.0.0.1", strconv.Itoa(5031)),
 	}
+	ansBytes := make([]byte, 1024)
 	name := "Stabby"
 	date := time.Now().UnixNano()
 	data := "This is an intenntionally long and rambling sentence to pad out the size of the message."
@@ -38,6 +39,7 @@ func main() {
 		if err != nil {
 			log.Print("There was an error")
 			log.Print(err)
+			break
 		}
 		count = count + 1
 		if lastTime.Second() != currentTime.Second() {
@@ -46,5 +48,11 @@ func main() {
 			count = 0
 		}
 		currentTime = time.Now()
+		if n, err := btw.Read(ansBytes); err != nil {
+			log.Println("Read error:", err)
+			break
+		} else {
+			log.Println("From server:", string(ansBytes[0:n]))
+		}
 	}
 }
